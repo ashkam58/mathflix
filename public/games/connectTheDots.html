@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect-the-Dots Constellations</title>
+
+    <!-- React and ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background-color: #0f172a;
+            /* Slate 900 */
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        .font-sci-fi {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .star-glow {
+            filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.8));
+            animation: pulse 2s infinite ease-in-out;
+        }
+
+        .line-draw {
+            stroke-dasharray: 100;
+            stroke-dashoffset: 0;
+            animation: dash 1s linear;
+        }
+
+        @keyframes dash {
+            from {
+                stroke-dashoffset: 100;
+            }
+
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        @keyframes pulse {
+            0% {
+                r: 0.2;
+                opacity: 0.8;
+            }
+
+            50% {
+                r: 0.3;
+                opacity: 1;
+            }
+
+            100% {
+                r: 0.2;
+                opacity: 0.8;
+            }
+        }
+
+        @keyframes twinkle {
+
+            0%,
+            100% {
+                opacity: 0.2;
+                transform: scale(0.8);
+            }
+
+            50% {
+                opacity: 0.8;
+                transform: scale(1.2);
+            }
+        }
+
+        .bg-stars {
+            background-image: radial-gradient(white 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+
+        const { useState, useEffect, useRef } = React;
+
+        // --- Icons (Inline) ---
+        const StarIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-yellow-400"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+        );
+        const RefreshIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></svg>
+        );
+        const CheckIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-green-500"><polyline points="20 6 9 17 4 12" /></svg>
+        );
+        const ArrowRight = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
+        );
+
+        // --- Game Levels Data ---
+        // Coordinates must be within 0-10 or 0-12 range for best visibility
+        const LEVELS = [
+            {
+                id: 1,
+                name: "The Iron Rocket",
+                points: [
+                    { x: 5, y: 1 }, { x: 8, y: 1 }, { x: 8, y: 5 }, { x: 9, y: 4 },
+                    { x: 9, y: 5 }, { x: 6.5, y: 9 }, { x: 4, y: 5 }, { x: 4, y: 4 },
+                    { x: 5, y: 5 }, { x: 5, y: 1 }
+                ],
+                hint: "Start at the engine base (5, 1)!"
+            },
+            {
+                id: 2,
+                name: "The King's Crown",
+                points: [
+                    { x: 2, y: 2 }, { x: 8, y: 2 }, { x: 9, y: 7 }, { x: 7, y: 4 },
+                    { x: 5, y: 8 }, { x: 3, y: 4 }, { x: 1, y: 7 }, { x: 2, y: 2 }
+                ],
+                hint: "Begin at the bottom left corner (2, 2)."
+            },
+            {
+                id: 3,
+                name: "Mystery Animal",
+                points: [
+                    { x: 2, y: 4 }, { x: 3, y: 6 }, { x: 3, y: 8 }, { x: 4, y: 9 },
+                    { x: 5, y: 8 }, { x: 6, y: 9 }, { x: 7, y: 8 }, { x: 7, y: 6 },
+                    { x: 8, y: 4 }, { x: 7, y: 2 }, { x: 3, y: 2 }, { x: 2, y: 4 }
+                ],
+                hint: "It looks like a friendly cat or bear face!"
+            },
+            {
+                id: 4,
+                name: "Lightning Bolt",
+                points: [
+                    { x: 7, y: 9 }, { x: 4, y: 5 }, { x: 6, y: 5 }, { x: 3, y: 1 },
+                    { x: 6, y: 4 }, { x: 4, y: 4 }, { x: 7, y: 9 }
+                ],
+                hint: "Strike from the sky at (7, 9)!"
+            }
+        ];
+
+        // --- Components ---
+
+        const CoordinateTable = ({ points, currentIndex, completed }) => {
+            // Auto-scroll to keep current item in view
+            const listRef = useRef(null);
+            const activeRef = useRef(null);
+
+            useEffect(() => {
+                if (activeRef.current) {
+                    activeRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+                }
+            }, [currentIndex]);
+
+            return (
+                <div className="bg-slate-800/80 border border-slate-600 rounded-lg overflow-hidden flex flex-col h-full shadow-lg backdrop-blur-sm">
+                    <div className="bg-slate-900 p-3 border-b border-slate-600 flex justify-between items-center">
+                        <h3 className="font-bold text-blue-300 text-sm uppercase tracking-wider">Mission Log</h3>
+                        <span className="text-xs text-slate-400">{points.length} Points</span>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-hide" ref={listRef}>
+                        {points.map((pt, idx) => {
+                            const isDone = idx < currentIndex;
+                            const isCurrent = idx === currentIndex && !completed;
+
+                            return (
+                                <div
+                                    key={idx}
+                                    ref={isCurrent ? activeRef : null}
+                                    className={`flex items-center justify-between p-2 rounded transition-all duration-300 ${isDone ? 'bg-green-900/30 text-green-400 opacity-60' :
+                                            isCurrent ? 'bg-blue-600 text-white scale-105 shadow-md font-bold' :
+                                                'bg-slate-700/30 text-slate-400'
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <span className={`text-xs font-mono w-6 text-right ${isCurrent ? 'text-blue-200' : 'text-slate-500'}`}>#{idx + 1}</span>
+                                        <span className="font-mono text-lg tracking-widest">({pt.x}, {pt.y})</span>
+                                    </div>
+                                    {isDone && <CheckIcon />}
+                                    {isCurrent && <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        };
+
+        const SkyGrid = ({ currentPoints, plottedPoints, nextPoint, onGridClick, showHint }) => {
+            const gridSize = 10; // 0-10
+            const padding = 1;
+            const viewBoxSize = gridSize + 2 * padding;
+
+            // Convert Logical (x,y) to SVG
+            // 0,0 is Bottom-Left
+            const toSvg = (x, y) => ({
+                x: x + padding,
+                y: (gridSize - y) + padding
+            });
+
+            const lines = [];
+            const labels = [];
+            const interactionPoints = [];
+
+            // --- Build Grid ---
+            for (let i = 0; i <= gridSize; i++) {
+                // Vertical
+                let start = toSvg(i, 0);
+                let end = toSvg(i, gridSize);
+                lines.push(<line key={`v-${i}`} x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke="#334155" strokeWidth="0.03" />);
+                labels.push(<text key={`xl-${i}`} x={start.x} y={start.y + 0.5} fontSize="0.3" fill="#64748b" textAnchor="middle">{i}</text>);
+
+                // Horizontal
+                start = toSvg(0, i);
+                end = toSvg(gridSize, i);
+                lines.push(<line key={`h-${i}`} x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke="#334155" strokeWidth="0.03" />);
+                labels.push(<text key={`yl-${i}`} x={start.x - 0.3} y={start.y + 0.1} fontSize="0.3" fill="#64748b" textAnchor="end">{i}</text>);
+
+                // Touch targets
+                for (let j = 0; j <= gridSize; j++) {
+                    const p = toSvg(i, j);
+
+                    // Is this the correct next point? (For hint highlighting)
+                    const isTarget = nextPoint && i === nextPoint.x && j === nextPoint.y;
+
+                    interactionPoints.push(
+                        <circle
+                            key={`p-${i}-${j}`}
+                            cx={p.x}
+                            cy={p.y}
+                            r={isTarget && showHint ? 0.3 : 0.25}
+                            fill="transparent"
+                            stroke={isTarget && showHint ? "rgba(234, 179, 8, 0.5)" : "transparent"}
+                            strokeWidth="0.05"
+                            className="cursor-pointer hover:fill-white/20 transition-all duration-300"
+                            onClick={() => onGridClick(i, j)}
+                        />
+                    );
+                }
+            }
+
+            // --- Build Constellation Lines ---
+            const constellationPath = plottedPoints.map((p, i) => {
+                const svgP = toSvg(p.x, p.y);
+                return `${i === 0 ? 'M' : 'L'} ${svgP.x} ${svgP.y}`;
+            }).join(' ');
+
+            return (
+                <div className="relative w-full aspect-square max-w-lg bg-slate-900 rounded-xl shadow-2xl border-4 border-slate-700 overflow-hidden group">
+                    {/* Background Stars Decoration */}
+                    <div className="absolute inset-0 bg-stars opacity-30 pointer-events-none"></div>
+
+                    <svg viewBox={`0 0 ${viewBoxSize} ${viewBoxSize}`} className="w-full h-full relative z-10">
+                        {/* Axes Highlights */}
+                        <line x1={padding} y1={padding} x2={padding} y2={gridSize + padding} stroke="#475569" strokeWidth="0.1" />
+                        <line x1={padding} y1={gridSize + padding} x2={gridSize + padding} y2={gridSize + padding} stroke="#475569" strokeWidth="0.1" />
+
+                        {lines}
+                        {labels}
+
+                        {/* Drawn Path */}
+                        <path d={constellationPath} fill="none" stroke="#60a5fa" strokeWidth="0.1" strokeLinecap="round" strokeLinejoin="round" className="line-draw drop-shadow-[0_0_3px_rgba(96,165,250,0.8)]" />
+
+                        {/* Plotted Stars */}
+                        {plottedPoints.map((p, i) => {
+                            const svgP = toSvg(p.x, p.y);
+                            // Determine if it's the last one (pulsing)
+                            const isLast = i === plottedPoints.length - 1;
+                            return (
+                                <circle
+                                    key={`star-${i}`}
+                                    cx={svgP.x}
+                                    cy={svgP.y}
+                                    r={isLast ? "0.15" : "0.12"}
+                                    fill="#facc15"
+                                    className={isLast ? "star-glow" : ""}
+                                />
+                            );
+                        })}
+
+                        {/* Target Ghost (Only if hinted) */}
+                        {showHint && nextPoint && (
+                            <circle cx={toSvg(nextPoint.x, nextPoint.y).x} cy={toSvg(nextPoint.x, nextPoint.y).y} r="0.1" fill="rgba(255,255,255,0.3)" className="animate-ping" />
+                        )}
+
+                        {/* Interaction Layer */}
+                        {interactionPoints}
+
+                        {/* Labels */}
+                        <text x={viewBoxSize / 2} y={viewBoxSize - 0.1} fontSize="0.3" fill="#475569" textAnchor="middle">X - AXIS</text>
+                        <text x={0.2} y={viewBoxSize / 2} fontSize="0.3" fill="#475569" textAnchor="middle" transform={`rotate(-90, 0.2, ${viewBoxSize / 2})`}>Y - AXIS</text>
+
+                    </svg>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [levelIdx, setLevelIdx] = useState(0);
+            const [plottedPoints, setPlottedPoints] = useState([]);
+            const [nextIndex, setNextIndex] = useState(0); // Index in level.points
+            const [feedback, setFeedback] = useState("Ready to chart the stars, Captain?");
+            const [showHint, setShowHint] = useState(false);
+            const [gameWon, setGameWon] = useState(false);
+            const [shake, setShake] = useState(false);
+
+            const currentLevel = LEVELS[levelIdx];
+            const targetPoint = currentLevel.points[nextIndex];
+
+            const resetLevel = () => {
+                setPlottedPoints([]);
+                setNextIndex(0);
+                setFeedback(currentLevel.hint);
+                setGameWon(false);
+                setShowHint(false);
+            };
+
+            useEffect(() => {
+                resetLevel();
+            }, [levelIdx]);
+
+            const handleGridClick = (x, y) => {
+                if (gameWon) return;
+
+                // Check if user clicked the correct next point
+                if (x === targetPoint.x && y === targetPoint.y) {
+                    // Correct
+                    const newPlotted = [...plottedPoints, targetPoint];
+                    setPlottedPoints(newPlotted);
+                    setShowHint(false);
+
+                    // Check completion
+                    if (nextIndex + 1 >= currentLevel.points.length) {
+                        setGameWon(true);
+                        setNextIndex(nextIndex + 1); // Mark all as done
+                        setFeedback("Constellation Complete! Excellent work.");
+                    } else {
+                        setNextIndex(nextIndex + 1);
+                        setFeedback("Correct! Chart the next star.");
+                    }
+                } else {
+                    // Incorrect
+                    setFeedback(`Missed! That was (${x}, ${y}). Look for (${targetPoint.x}, ${targetPoint.y}).`);
+                    setShake(true);
+                    setTimeout(() => setShake(false), 500);
+
+                    // Show hint after error
+                    setShowHint(true);
+                }
+            };
+
+            const nextLevel = () => {
+                if (levelIdx < LEVELS.length - 1) {
+                    setLevelIdx(prev => prev + 1);
+                } else {
+                    // Loop back or end? Let's loop back for endless play
+                    setLevelIdx(0);
+                }
+            };
+
+            return (
+                <div className="min-h-screen p-4 flex flex-col items-center justify-center relative">
+
+                    {/* Header */}
+                    <header className="mb-6 text-center z-10">
+                        <div className="inline-flex items-center gap-2 mb-2 bg-slate-800/50 px-4 py-1 rounded-full border border-blue-500/30">
+                            <StarIcon />
+                            <span className="text-yellow-400 font-bold uppercase tracking-widest text-xs">Astro-Grapher v1.0</span>
+                        </div>
+                        <h1 className="text-3xl md:text-5xl font-sci-fi text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-purple-400 drop-shadow-lg">
+                            Constellation Connect
+                        </h1>
+                        <p className="text-slate-400 text-sm font-mono mt-1">Level {levelIdx + 1}: {currentLevel.name}</p>
+                    </header>
+
+                    {/* Main Game Area */}
+                    <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-12 gap-6 items-start z-10">
+
+                        {/* Left: Data Table (Takes 4 cols) */}
+                        <div className="md:col-span-4 h-[400px] md:h-[500px]">
+                            <CoordinateTable
+                                points={currentLevel.points}
+                                currentIndex={nextIndex}
+                                completed={gameWon}
+                            />
+                        </div>
+
+                        {/* Right: Grid (Takes 8 cols) */}
+                        <div className="md:col-span-8 flex flex-col items-center">
+
+                            {/* Feedback Toast */}
+                            <div className={`mb-4 px-6 py-3 rounded-lg border font-bold text-sm shadow-xl transition-all duration-300 w-full text-center ${shake ? 'bg-red-900/40 border-red-500 text-red-200 animate-bounce' :
+                                    gameWon ? 'bg-green-900/40 border-green-500 text-green-200 scale-105' :
+                                        'bg-blue-900/20 border-blue-500/50 text-blue-100'
+                                }`}>
+                                {feedback}
+                            </div>
+
+                            <SkyGrid
+                                currentPoints={currentLevel.points}
+                                plottedPoints={plottedPoints}
+                                nextPoint={targetPoint}
+                                onGridClick={handleGridClick}
+                                showHint={showHint}
+                            />
+
+                            {/* Controls */}
+                            <div className="mt-6 flex gap-4">
+                                <button
+                                    onClick={resetLevel}
+                                    className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded flex items-center gap-2 transition"
+                                >
+                                    <RefreshIcon /> Reset
+                                </button>
+
+                                {gameWon && (
+                                    <button
+                                        onClick={nextLevel}
+                                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-8 py-2 rounded font-bold shadow-lg flex items-center gap-2 animate-pulse"
+                                    >
+                                        Next Galaxy <ArrowRight />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                    </div>
+
+                    {/* Footer Skill Tag */}
+                    <div className="mt-12 text-slate-500 text-xs font-mono text-center">
+                        <p>Skill Target: LL.3 (Graphing Points) & LL.5 (Graphing from a Table)</p>
+                    </div>
+
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+
+    </script>
+</body>
+
+</html>

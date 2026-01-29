@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coordinate Battleship</title>
+
+    <!-- React and ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background-color: #0f172a;
+            color: #e2e8f0;
+        }
+
+        .font-military {
+            font-family: 'Black Ops One', cursive;
+        }
+
+        .grid-cell {
+            transition: all 0.2s;
+        }
+
+        .grid-cell:hover {
+            border-color: #38bdf8;
+            box-shadow: inset 0 0 10px rgba(56, 189, 248, 0.5);
+        }
+
+        /* Animations */
+        @keyframes explode {
+            0% {
+                transform: scale(0.5);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.5);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 0;
+            }
+        }
+
+        .animate-explode {
+            animation: explode 0.4s ease-out forwards;
+        }
+
+        @keyframes splash {
+            0% {
+                transform: scale(0);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1.2);
+                opacity: 0;
+            }
+        }
+
+        .animate-splash {
+            animation: splash 0.4s ease-out forwards;
+        }
+
+        .radar-scan {
+            background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.1), transparent);
+            background-size: 200% 100%;
+            animation: scan 3s linear infinite;
+        }
+
+        @keyframes scan {
+            0% {
+                background-position: 100% 0;
+            }
+
+            100% {
+                background-position: -100% 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+
+        const { useState, useEffect, useCallback } = React;
+
+        // --- Icons (Inline SVGs) ---
+        const Crosshair = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline-block"><circle cx="12" cy="12" r="10" /><line x1="22" y1="12" x2="18" y2="12" /><line x1="6" y1="12" x2="2" y2="12" /><line x1="12" y1="6" x2="12" y2="2" /><line x1="12" y1="22" x2="12" y2="18" /></svg>
+        );
+        const RotateIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></svg>
+        );
+
+        // --- Constants ---
+        const BOARD_SIZE = 10;
+        const SHIPS = [
+            { name: 'Carrier', size: 5, id: 'carrier' },
+            { name: 'Battleship', size: 4, id: 'battleship' },
+            { name: 'Cruiser', size: 3, id: 'cruiser' },
+            { name: 'Submarine', size: 3, id: 'submarine' },
+            { name: 'Destroyer', size: 2, id: 'destroyer' },
+        ];
+
+        // --- Helper Functions ---
+        const createBoard = () => Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
+
+        const isValidPlacement = (board, size, x, y, isVertical) => {
+            if (isVertical) {
+                if (y + size > BOARD_SIZE) return false;
+                for (let i = 0; i < size; i++) if (board[y + i][x]) return false;
+            } else {
+                if (x + size > BOARD_SIZE) return false;
+                for (let i = 0; i < size; i++) if (board[y][x + i]) return false;
+            }
+            return true;
+        };
+
+        const placeShipOnBoard = (board, ship, x, y, isVertical) => {
+            const newBoard = board.map(row => [...row]);
+            const shipCoords = [];
+            for (let i = 0; i < ship.size; i++) {
+                const py = isVertical ? y + i : y;
+                const px = isVertical ? x : x + i;
+                newBoard[py][px] = { id: ship.id, index: i };
+                shipCoords.push({ x: px, y: py });
+            }
+            return { newBoard, shipCoords };
+        };
+
+        // --- Components ---
+
+        const Board = ({
+            boardData,
+            shots,
+            isEnemy,
+            onCellClick,
+            placementMode,
+            hoverShip,
+            shipOrientation
+        }) => {
+            const [hoverPos, setHoverPos] = useState(null);
+
+            // Coordinate Helpers
+            const getCellContent = (x, y) => {
+                const shot = shots.find(s => s.x === x && s.y === y);
+                const cell = boardData[y][x];
+
+                // Ghost ship for placement preview
+                if (placementMode && hoverPos && hoverShip) {
+                    // Check if this cell is part of the ghost ship
+                    const isVertical = shipOrientation === 'vertical';
+                    const dx = x - hoverPos.x;
+                    const dy = y - hoverPos.y;
+
+                    // Check bounds of ghost ship
+                    let inGhost = false;
+                    let valid = true; // Is the whole ship valid?
+
+                    // Simple calculation to see if current cell (x,y) is part of the hypothetical ship at hoverPos
+                    if (isVertical) {
+                        if (x === hoverPos.x && y >= hoverPos.y && y < hoverPos.y + hoverShip.size) inGhost = true;
+                    } else {
+                        if (y === hoverPos.y && x >= hoverPos.x && x < hoverPos.x + hoverShip.size) inGhost = true;
+                    }
+
+                    if (inGhost) {
+                        // Check validity of the whole placement
+                        valid = isValidPlacement(boardData, hoverShip.size, hoverPos.x, hoverPos.y, isVertical);
+                        return <div className={`absolute inset-0 opacity-50 ${valid ? 'bg-green-500' : 'bg-red-500'} border-2 border-white`}></div>;
+                    }
+                }
+
+                if (shot) {
+                    if (shot.hit) return <div className="absolute inset-0 flex items-center justify-center"><div className="w-4 h-4 bg-red-600 rounded-full animate-explode shadow-[0_0_10px_rgba(220,38,38,0.8)]"></div></div>;
+                    return <div className="absolute inset-0 flex items-center justify-center"><div className="w-2 h-2 bg-white rounded-full animate-splash opacity-50"></div></div>;
+                }
+
+                if (cell && !isEnemy) {
+                    return <div className="absolute inset-1 bg-slate-500 border border-slate-400 rounded-sm shadow-inner"></div>;
+                }
+
+                // Sunk ship display for enemy (optional reveal)
+                if (cell && isEnemy && cell.sunk) {
+                    return <div className="absolute inset-1 bg-red-900/50 border border-red-800 rounded-sm"></div>;
+                }
+
+                return null;
+            };
+
+            return (
+                <div className="relative">
+                    {/* Y Axis Labels */}
+                    <div className="absolute left-[-2rem] top-0 bottom-0 flex flex-col justify-around text-xs text-slate-400 font-mono">
+                        {Array(BOARD_SIZE).fill(0).map((_, i) => (
+                            <div key={i} className="flex items-center justify-end h-full pr-2">{BOARD_SIZE - 1 - i}</div>
+                        ))}
+                    </div>
+
+                    {/* Grid Container */}
+                    <div
+                        className={`grid grid-cols-10 grid-rows-10 w-full aspect-square border-2 ${isEnemy ? 'border-red-900 bg-red-950/20' : 'border-blue-900 bg-blue-950/20'}`}
+                        onMouseLeave={() => setHoverPos(null)}
+                    >
+                        {/* We map rows reversed to have Y=0 at bottom if we want true cartesian, 
+                    but standard matrices are Y=0 top.
+                    Let's stick to: Top-Left is (0,9) or (0,0)? 
+                    Math graphs: (0,0) is bottom-left.
+                    Let's implement (0,0) at Bottom-Left for Math correctness.
+                */}
+                        {Array(BOARD_SIZE).fill(0).map((_, rowIdx) => {
+                            const y = BOARD_SIZE - 1 - rowIdx; // 9 down to 0
+                            return Array(BOARD_SIZE).fill(0).map((_, x) => (
+                                <div
+                                    key={`${x}-${y}`}
+                                    className={`relative border border-white/5 cursor-crosshair grid-cell ${isEnemy ? 'hover:bg-red-500/10' : 'hover:bg-blue-500/10'}`}
+                                    onClick={() => onCellClick(x, y)}
+                                    onMouseEnter={() => setHoverPos({ x, y })}
+                                >
+                                    {/* Grid Lines/Dots for graph paper look */}
+                                    <div className="absolute top-0 right-0 w-[1px] h-full bg-white/5"></div>
+                                    <div className="absolute bottom-0 left-0 w-full h-[1px] bg-white/5"></div>
+
+                                    {getCellContent(x, y)}
+                                </div>
+                            ));
+                        })}
+                    </div>
+
+                    {/* X Axis Labels */}
+                    <div className="flex justify-around text-xs text-slate-400 font-mono mt-1">
+                        {Array(BOARD_SIZE).fill(0).map((_, i) => (
+                            <div key={i} className="w-full text-center">{i}</div>
+                        ))}
+                    </div>
+
+                    {/* Axis Titles */}
+                    <div className="absolute -left-10 top-1/2 -rotate-90 text-xs text-blue-400 font-bold">Y - Axis</div>
+                    <div className="absolute bottom-[-1.5rem] left-1/2 -translate-x-1/2 text-xs text-blue-400 font-bold">X - Axis</div>
+                </div>
+            );
+        };
+
+        const LogPanel = ({ logs }) => {
+            // Auto-scroll to bottom
+            const bottomRef = React.useRef(null);
+            useEffect(() => {
+                bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, [logs]);
+
+            return (
+                <div className="bg-slate-900 border border-slate-700 h-48 rounded-md p-2 overflow-y-auto font-mono text-xs shadow-inner">
+                    {logs.length === 0 && <div className="text-slate-600 italic">Mission log is empty. Awaiting orders...</div>}
+                    {logs.map((log, i) => (
+                        <div key={i} className={`mb-1 ${log.type === 'hit' ? 'text-red-400 font-bold' : log.type === 'sink' ? 'text-yellow-400 font-bold uppercase' : 'text-slate-300'}`}>
+                            <span className="opacity-50 mr-2">[{log.time}]</span>
+                            {log.msg}
+                        </div>
+                    ))}
+                    <div ref={bottomRef} />
+                </div>
+            );
+        };
+
+        // --- Main App ---
+
+        const BattleshipApp = () => {
+            // Game State
+            const [phase, setPhase] = useState('setup'); // setup, playing, gameover
+            const [winner, setWinner] = useState(null);
+            const [turn, setTurn] = useState('player'); // player, computer
+
+            // Boards
+            const [playerBoard, setPlayerBoard] = useState(createBoard());
+            const [compBoard, setCompBoard] = useState(createBoard());
+
+            // Ships State (Track health)
+            const [playerShips, setPlayerShips] = useState([]);
+            const [compShips, setCompShips] = useState([]);
+
+            // Shots Fired
+            const [playerShots, setPlayerShots] = useState([]); // Shots taken BY player
+            const [compShots, setCompShots] = useState([]); // Shots taken BY computer
+
+            // Setup State
+            const [currentShipIndex, setCurrentShipIndex] = useState(0);
+            const [orientation, setOrientation] = useState('horizontal');
+
+            // Logs
+            const [logs, setLogs] = useState([]);
+
+            const addLog = (msg, type = 'info') => {
+                const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                setLogs(prev => [...prev, { msg, type, time }]);
+            };
+
+            // --- Logic: Random Placement ---
+            const placeShipsRandomly = () => {
+                let board = createBoard();
+                let placedShips = [];
+
+                SHIPS.forEach(ship => {
+                    let placed = false;
+                    while (!placed) {
+                        const isVertical = Math.random() > 0.5;
+                        const x = Math.floor(Math.random() * BOARD_SIZE);
+                        const y = Math.floor(Math.random() * BOARD_SIZE);
+
+                        if (isValidPlacement(board, ship.size, x, y, isVertical)) {
+                            const res = placeShipOnBoard(board, ship, x, y, isVertical);
+                            board = res.newBoard;
+                            placedShips.push({ ...ship, coords: res.shipCoords, hits: 0 });
+                            placed = true;
+                        }
+                    }
+                });
+                return { board, placedShips };
+            };
+
+            // Initialize Computer Board
+            useEffect(() => {
+                const { board, placedShips } = placeShipsRandomly();
+                setCompBoard(board);
+                setCompShips(placedShips);
+            }, []);
+
+            // --- Logic: Player Actions ---
+
+            const handleSetupClick = (x, y) => {
+                if (phase !== 'setup') return;
+
+                const ship = SHIPS[currentShipIndex];
+                const isVertical = orientation === 'vertical';
+
+                if (isValidPlacement(playerBoard, ship.size, x, y, isVertical)) {
+                    const { newBoard, shipCoords } = placeShipOnBoard(playerBoard, ship, x, y, isVertical);
+                    setPlayerBoard(newBoard);
+                    setPlayerShips([...playerShips, { ...ship, coords: shipCoords, hits: 0 }]);
+
+                    if (currentShipIndex < SHIPS.length - 1) {
+                        setCurrentShipIndex(currentShipIndex + 1);
+                    } else {
+                        setPhase('playing');
+                        addLog("Deployment complete. Battle stations!", "info");
+                        addLog("Use the coordinates to aim your cannons.", "info");
+                    }
+                } else {
+                    addLog(`Cannot place ${ship.name} at (${x}, ${y}). Invalid position.`, "error");
+                }
+            };
+
+            const handlePlayerFire = (x, y) => {
+                if (phase !== 'playing' || turn !== 'player') return;
+
+                // Check if already fired here
+                if (playerShots.some(s => s.x === x && s.y === y)) return;
+
+                // Check Hit/Miss
+                const cell = compBoard[y][x];
+                const isHit = cell !== null;
+
+                const newShots = [...playerShots, { x, y, hit: isHit }];
+                setPlayerShots(newShots);
+
+                if (isHit) {
+                    addLog(`Direct hit at (${x}, ${y})!`, "hit");
+                    // Update ship damage
+                    const newShips = compShips.map(s => {
+                        if (s.id === cell.id) {
+                            const newHits = s.hits + 1;
+                            if (newHits === s.size) addLog(`Enemy ${s.name} sunk!`, "sink");
+                            return { ...s, hits: newHits };
+                        }
+                        return s;
+                    });
+                    setCompShips(newShips);
+
+                    // Check Win
+                    if (newShips.every(s => s.hits === s.size)) {
+                        setWinner('player');
+                        setPhase('gameover');
+                    }
+                } else {
+                    addLog(`Miss at (${x}, ${y}). Water splash.`, "info");
+                    setTurn('computer');
+                }
+            };
+
+            // --- Logic: Computer AI ---
+            useEffect(() => {
+                if (turn === 'computer' && phase === 'playing') {
+                    const timer = setTimeout(() => {
+                        // Simple AI: Random unshot coordinate
+                        let valid = false;
+                        let tx, ty;
+                        while (!valid) {
+                            tx = Math.floor(Math.random() * BOARD_SIZE);
+                            ty = Math.floor(Math.random() * BOARD_SIZE);
+                            if (!compShots.some(s => s.x === tx && s.y === ty)) valid = true;
+                        }
+
+                        // Check Hit
+                        const cell = playerBoard[ty][tx];
+                        const isHit = cell !== null;
+
+                        setCompShots(prev => [...prev, { x: tx, y: ty, hit: isHit }]);
+
+                        if (isHit) {
+                            addLog(`Alert! Enemy fired at (${tx}, ${ty}) - HIT!`, "hit");
+
+                            const newShips = playerShips.map(s => {
+                                if (s.id === cell.id) {
+                                    const newHits = s.hits + 1;
+                                    if (newHits === s.size) addLog(`Our ${s.name} has been sunk!`, "sink");
+                                    return { ...s, hits: newHits };
+                                }
+                                return s;
+                            });
+                            setPlayerShips(newShips);
+
+                            if (newShips.every(s => s.hits === s.size)) {
+                                setWinner('computer');
+                                setPhase('gameover');
+                            } else {
+                                // AI fires again on hit? Let's keep it simple: turn passes to give player a chance
+                                // Standard rules: hit = shoot again. Simplified: 1 shot per turn.
+                                setTurn('player');
+                            }
+                        } else {
+                            addLog(`Enemy fired at (${tx}, ${ty}) - Miss.`, "info");
+                            setTurn('player');
+                        }
+
+                    }, 1500); // Delay for suspense
+                    return () => clearTimeout(timer);
+                }
+            }, [turn, phase, compShots, playerBoard, playerShips]);
+
+
+            // --- Render Helpers ---
+
+            return (
+                <div className="min-h-screen p-4 flex flex-col items-center">
+                    {/* Header */}
+                    <header className="w-full max-w-5xl flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+                        <div>
+                            <h1 className="text-3xl md:text-5xl font-military text-blue-500 tracking-wider uppercase">Grid Battleship</h1>
+                            <p className="text-sm text-slate-400 font-mono mt-1">Targeting System: Coordinate Plane (0-9)</p>
+                        </div>
+                        <div className="text-right hidden md:block">
+                            <div className="text-xs text-slate-500 uppercase">Status</div>
+                            <div className={`text-xl font-bold ${phase === 'playing' ? 'text-green-400 animate-pulse' : 'text-slate-300'}`}>
+                                {phase === 'setup' ? 'DEPLOYMENT PHASE' : phase === 'gameover' ? 'MISSION ENDED' : 'COMBAT ACTIVE'}
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Game Area */}
+                    <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+
+                        {/* Player Zone */}
+                        <div className="flex flex-col gap-4">
+                            <div className="flex justify-between items-end">
+                                <h2 className="text-blue-400 font-bold font-military text-xl tracking-widest flex items-center gap-2">
+                                    <span className="w-3 h-3 bg-blue-500 rounded-full"></span> FRIENDLY WATERS
+                                </h2>
+                                <div className="text-xs text-slate-400">
+                                    Ships: {playerShips.filter(s => s.hits < s.size).length}/{SHIPS.length}
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-800 p-4 rounded-lg shadow-2xl relative">
+                                <Board
+                                    boardData={playerBoard}
+                                    shots={compShots}
+                                    isEnemy={false}
+                                    onCellClick={handleSetupClick}
+                                    placementMode={phase === 'setup'}
+                                    hoverShip={SHIPS[currentShipIndex]}
+                                    shipOrientation={orientation}
+                                />
+
+                                {/* Setup Controls Overlay */}
+                                {phase === 'setup' && (
+                                    <div className="mt-4 p-4 bg-slate-900/80 rounded border border-slate-700">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-blue-300 font-bold">Deploying: {SHIPS[currentShipIndex].name} ({SHIPS[currentShipIndex].size} units)</span>
+                                            <button
+                                                onClick={() => setOrientation(o => o === 'horizontal' ? 'vertical' : 'horizontal')}
+                                                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-xs transition"
+                                            >
+                                                <RotateIcon /> Rotate: {orientation.toUpperCase()}
+                                            </button>
+                                        </div>
+                                        <div className="text-xs text-slate-400">
+                                            Click grid to place. Ensure the ship fits within coordinates (0-9).
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Enemy Zone */}
+                        <div className="flex flex-col gap-4">
+                            <div className="flex justify-between items-end">
+                                <h2 className="text-red-400 font-bold font-military text-xl tracking-widest flex items-center gap-2">
+                                    <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span> ENEMY WATERS
+                                </h2>
+                                <div className="text-xs text-slate-400">
+                                    Status: {phase === 'setup' ? 'Scanning...' : 'Locked'}
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-800 p-4 rounded-lg shadow-2xl relative overflow-hidden">
+                                {/* Radar Effect overlay during setup */}
+                                {phase === 'setup' && (
+                                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm radar-scan">
+                                        <div className="text-2xl font-military text-blue-400 mb-2">AWAITING DEPLOYMENT</div>
+                                        <div className="text-xs text-slate-400">Place your ships to begin scanning</div>
+                                    </div>
+                                )}
+
+                                <Board
+                                    boardData={compBoard}
+                                    shots={playerShots}
+                                    isEnemy={true}
+                                    onCellClick={handlePlayerFire}
+                                    placementMode={false}
+                                />
+
+                                {/* Turn Indicator Overlay */}
+                                {phase === 'playing' && (
+                                    <div className={`absolute top-4 right-4 px-4 py-1 rounded-full text-xs font-bold shadow-lg transition-all duration-300 ${turn === 'player' ? 'bg-green-600 text-white scale-110' : 'bg-red-900/50 text-red-200'}`}>
+                                        {turn === 'player' ? 'YOUR TURN - SELECT COORDINATES' : 'ENEMY FIRING...'}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                    </div>
+
+                    {/* Bottom Panel: Logs and Info */}
+                    <div className="w-full max-w-6xl mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="md:col-span-2">
+                            <h3 className="text-slate-400 text-xs uppercase font-bold mb-2">Combat Log</h3>
+                            <LogPanel logs={logs} />
+                        </div>
+                        <div className="flex flex-col justify-between">
+                            <div className="bg-slate-800 p-4 rounded border border-slate-700">
+                                <h3 className="text-slate-400 text-xs uppercase font-bold mb-2">Coordinates Guide</h3>
+                                <p className="text-sm text-slate-300 mb-2">
+                                    Points are written as <span className="text-yellow-400 font-mono">(x, y)</span>.
+                                </p>
+                                <ul className="text-xs text-slate-400 space-y-1 list-disc pl-4">
+                                    <li><strong className="text-white">x</strong> is horizontal (left/right)</li>
+                                    <li><strong className="text-white">y</strong> is vertical (up/down)</li>
+                                    <li>(0,0) is the bottom-left corner.</li>
+                                </ul>
+                            </div>
+                            {phase === 'gameover' && (
+                                <button
+                                    onClick={() => window.location.reload()}
+                                    className="mt-4 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded shadow-lg transition"
+                                >
+                                    PLAY AGAIN
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Game Over Modal */}
+                    {phase === 'gameover' && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                            <div className="bg-slate-800 border-2 border-slate-600 p-8 rounded-xl max-w-md w-full text-center shadow-2xl animate-explode">
+                                <h2 className={`text-4xl font-military mb-4 ${winner === 'player' ? 'text-green-400' : 'text-red-500'}`}>
+                                    {winner === 'player' ? 'VICTORY!' : 'DEFEAT'}
+                                </h2>
+                                <p className="text-lg text-slate-300 mb-8">
+                                    {winner === 'player'
+                                        ? "Enemy fleet neutralized. Good shooting, Commander!"
+                                        : "Our fleet has been decimated. Return to base."}
+                                </p>
+                                <button
+                                    onClick={() => window.location.reload()}
+                                    className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transition transform hover:scale-105"
+                                >
+                                    NEW MISSION
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<BattleshipApp />);
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Number Line Hopper - The Great Pond Jump</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;900&display=swap');
+
+        :root {
+            --pond-blue: #48cae4;
+            --frog-green: #2ecc71;
+            --lily-green: #27ae60;
+            --mud-brown: #603813;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #caf0f8;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .cartoon-font {
+            font-family: 'Bungee', cursive;
+        }
+
+        .number-line {
+            stroke: var(--mud-brown);
+            stroke-width: 6;
+            stroke-linecap: round;
+        }
+
+        .tick {
+            stroke: var(--mud-brown);
+            stroke-width: 4;
+            stroke-linecap: round;
+        }
+
+        .frog {
+            transition: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.2));
+        }
+
+        .lilypad {
+            transition: transform 0.3s;
+            cursor: pointer;
+        }
+
+        .lilypad:hover {
+            transform: scale(1.1);
+        }
+
+        .target-glow {
+            animation: pulse-glow 1.5s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0% {
+                filter: drop-shadow(0 0 5px #f1c40f);
+            }
+
+            50% {
+                filter: drop-shadow(0 0 20px #f1c40f);
+            }
+
+            100% {
+                filter: drop-shadow(0 0 5px #f1c40f);
+            }
+        }
+
+        .snap-flash {
+            animation: snap-effect 0.2s ease-out;
+        }
+
+        @keyframes snap-effect {
+            0% {
+                background-color: white;
+            }
+
+            100% {
+                background-color: transparent;
+            }
+        }
+
+        .shake {
+            animation: shake-anim 0.4s ease-in-out;
+        }
+
+        @keyframes shake-anim {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-10px);
+            }
+
+            75% {
+                transform: translateX(10px);
+            }
+        }
+    </style>
+</head>
+
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <!-- HUD -->
+    <div class="w-full max-w-xl flex justify-between items-end mb-4 px-4">
+        <div>
+            <p class="cartoon-font text-blue-900 text-lg">STREAK: <span id="streak-val">0</span></p>
+            <div class="h-2 w-32 bg-blue-200 rounded-full overflow-hidden border-2 border-blue-900">
+                <div id="progress-bar" class="h-full bg-yellow-400 w-0 transition-all"></div>
+            </div>
+        </div>
+        <div class="text-right">
+            <h1 class="cartoon-font text-3xl text-blue-900 leading-none">HOPPER</h1>
+            <p class="text-[10px] font-black bg-blue-900 text-white px-2 py-0.5 rounded uppercase">Level 4: Points</p>
+        </div>
+    </div>
+
+    <!-- The Pond (Game Window) -->
+    <div id="pond-window"
+        class="relative w-full max-w-2xl aspect-[16/9] bg-white rounded-[3rem] border-8 border-blue-900 shadow-[12px_12px_0px_#023e8a] flex flex-col items-center justify-center overflow-hidden">
+
+        <!-- Instruction Overlay -->
+        <div class="absolute top-6 text-center">
+            <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Target Location</p>
+            <h2 class="cartoon-font text-5xl text-blue-900" id="target-display">2/3</h2>
+        </div>
+
+        <!-- SVG Number Line -->
+        <svg id="game-svg" viewBox="0 0 800 300" class="w-full h-full">
+            <!-- Water lines -->
+            <path d="M 50 220 Q 200 210 400 220 T 750 220" fill="none" stroke="#ade8f4" stroke-width="2" />
+
+            <!-- The Line -->
+            <line x1="100" y1="200" x2="700" y2="200" class="number-line" />
+
+            <!-- Endpoints -->
+            <text x="100" y="240" text-anchor="middle" class="cartoon-font text-2xl fill-blue-900">0</text>
+            <text x="700" y="240" text-anchor="middle" class="cartoon-font text-2xl fill-blue-900">1</text>
+
+            <!-- Ticks and Lilypads will be injected here -->
+            <g id="dynamic-elements"></g>
+
+            <!-- Frog -->
+            <g id="frog-group" class="frog" transform="translate(100, 180)">
+                <ellipse cx="0" cy="0" rx="25" ry="18" fill="#2ecc71" stroke="#1b5e20" stroke-width="3" />
+                <circle cx="-10" cy="-12" r="8" fill="white" stroke="#1b5e20" stroke-width="2" />
+                <circle cx="10" cy="-12" r="8" fill="white" stroke="#1b5e20" stroke-width="2" />
+                <circle cx="-10" cy="-12" r="3" fill="black" />
+                <circle cx="10" cy="-12" r="3" fill="black" />
+                <path d="M -15 5 Q 0 12 15 5" fill="none" stroke="#1b5e20" stroke-width="2" />
+            </g>
+        </svg>
+
+        <!-- Magnetic Snap Feedback -->
+        <div id="snap-overlay" class="absolute inset-0 pointer-events-none"></div>
+    </div>
+
+    <!-- Controls -->
+    <div class="w-full max-w-xl mt-8 space-y-6">
+        <div class="bg-white p-6 rounded-3xl border-4 border-blue-900 shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <span class="cartoon-font text-blue-900">How many parts?</span>
+                <span id="den-val" class="text-3xl cartoon-font text-green-500">3</span>
+            </div>
+            <!-- Denominator Slider with Auto-Precision logic -->
+            <input type="range" id="den-slider" min="2" max="8" step="1" value="3"
+                class="w-full h-6 bg-blue-100 rounded-full appearance-none cursor-pointer accent-green-500">
+        </div>
+
+        <button id="jump-btn"
+            class="w-full py-6 rounded-3xl bg-yellow-400 border-b-8 border-yellow-600 cartoon-font text-3xl text-blue-900 hover:brightness-110 active:border-b-0 active:translate-y-2 transition-all">
+            GO FROG GO!
+        </button>
+    </div>
+
+    <script>
+        const denSlider = document.getElementById('den-slider');
+        const denValEl = document.getElementById('den-val');
+        const dynamicElements = document.getElementById('dynamic-elements');
+        const targetDisplay = document.getElementById('target-display');
+        const frogGroup = document.getElementById('frog-group');
+        const jumpBtn = document.getElementById('jump-btn');
+        const streakValEl = document.getElementById('streak-val');
+        const progressBar = document.getElementById('progress-bar');
+        const snapOverlay = document.getElementById('snap-overlay');
+        const pondWindow = document.getElementById('pond-window');
+
+        let targetNum = 2;
+        let targetDen = 3;
+        let userNum = 0; // The lilypad they clicked
+        let currentStreak = 0;
+        let isJumping = false;
+
+        function initLevel() {
+            isJumping = false;
+            // Generate random fraction
+            targetDen = Math.floor(Math.random() * 6) + 2; // 2 to 7
+            targetNum = Math.floor(Math.random() * (targetDen - 1)) + 1;
+
+            targetDisplay.innerText = `${targetNum}/${targetDen}`;
+            userNum = -1; // Reset selection
+
+            // Auto-snap slider to a sensible starting point (optional, but keeps it clean)
+            denValEl.innerText = denSlider.value;
+
+            renderPond();
+            resetFrog();
+            jumpBtn.innerText = "GO FROG GO!";
+            jumpBtn.disabled = false;
+            jumpBtn.classList.replace('bg-green-400', 'bg-yellow-400');
+        }
+
+        function renderPond() {
+            const userDen = parseInt(denSlider.value);
+            let html = '';
+            const startX = 100;
+            const endX = 700;
+            const width = endX - startX;
+            const step = width / userDen;
+
+            for (let i = 0; i <= userDen; i++) {
+                const x = startX + (i * step);
+
+                // Add tick mark
+                html += `<line x1="${x}" y1="185" x2="${x}" y2="215" class="tick" />`;
+
+                // Add lilypad for points between 0 and 1
+                if (i > 0 && i < userDen) {
+                    const isSelected = (i === userNum);
+                    html += `
+                        <g class="lilypad ${isSelected ? 'target-glow' : ''}" onclick="selectPoint(${i})" transform="translate(${x}, 200)">
+                            <ellipse cx="0" cy="0" rx="25" ry="10" fill="${isSelected ? '#f1c40f' : '#27ae60'}" />
+                            <path d="M -15 -5 L 0 0 L 15 -5" fill="none" stroke="rgba(0,0,0,0.1)" stroke-width="2" />
+                        </g>
+                    `;
+                }
+            }
+            dynamicElements.innerHTML = html;
+        }
+
+        function selectPoint(num) {
+            if (isJumping) return;
+            userNum = num;
+
+            // MAGNETIC SNAP VISUAL
+            snapOverlay.classList.add('snap-flash');
+            setTimeout(() => snapOverlay.classList.remove('snap-flash'), 200);
+
+            renderPond();
+        }
+
+        function resetFrog() {
+            frogGroup.setAttribute('transform', `translate(100, 185)`);
+        }
+
+        async function handleJump() {
+            if (userNum === -1) {
+                pondWindow.classList.add('shake');
+                setTimeout(() => pondWindow.classList.remove('shake'), 400);
+                return;
+            }
+
+            isJumping = true;
+            jumpBtn.disabled = true;
+
+            const userDen = parseInt(denSlider.value);
+            const startX = 100;
+            const width = 600;
+            const targetX = startX + (userNum * (width / userDen));
+
+            // Frog Jumps to selected spot
+            frogGroup.setAttribute('transform', `translate(${targetX}, 185) scale(1.2)`);
+
+            setTimeout(() => {
+                frogGroup.setAttribute('transform', `translate(${targetX}, 185) scale(1)`);
+                verify();
+            }, 600);
+        }
+
+        function verify() {
+            const userDen = parseInt(denSlider.value);
+            const isCorrect = (userNum === targetNum && userDen === targetDen);
+
+            if (isCorrect) {
+                currentStreak++;
+                jumpBtn.innerText = "SPLASH! PERFECT!";
+                jumpBtn.classList.replace('bg-yellow-400', 'bg-green-400');
+
+                if (currentStreak >= 5) {
+                    win();
+                } else {
+                    setTimeout(initLevel, 1200);
+                }
+            } else {
+                currentStreak = 0;
+                pondWindow.classList.add('shake');
+                jumpBtn.innerText = "MISS! TRY AGAIN";
+                jumpBtn.classList.replace('bg-yellow-400', 'bg-red-400');
+
+                setTimeout(() => {
+                    pondWindow.classList.remove('shake');
+                    initLevel();
+                    jumpBtn.classList.replace('bg-red-400', 'bg-yellow-400');
+                }, 1500);
+            }
+
+            streakValEl.innerText = currentStreak;
+            progressBar.style.width = `${(currentStreak / 5) * 100}%`;
+        }
+
+        function win() {
+            dynamicElements.innerHTML = '';
+            targetDisplay.innerHTML = "🏆 MASTER!";
+            jumpBtn.innerText = "UNLOCKED: GHOST FRACTION MATCH";
+
+            // Party effect
+            const colors = ['#f1c40f', '#2ecc71', '#e74c3c', '#3498db'];
+            let circles = '';
+            for (let i = 0; i < 20; i++) {
+                circles += `<circle cx="${Math.random() * 800}" cy="${Math.random() * 300}" r="5" fill="${colors[Math.floor(Math.random() * 4)]}" opacity="0.8">
+                    <animate attributeName="cy" from="-10" to="350" dur="${1 + Math.random() * 2}s" repeatCount="indefinite" />
+                </circle>`;
+            }
+            dynamicElements.innerHTML = circles;
+        }
+
+        denSlider.addEventListener('input', () => {
+            denValEl.innerText = denSlider.value;
+            userNum = -1; // Reset selection if they change partitioning
+            renderPond();
+        });
+
+        jumpBtn.addEventListener('click', handleJump);
+
+        window.onload = initLevel;
+    </script>
+</body>
+
+</html>

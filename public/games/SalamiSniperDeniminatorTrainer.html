@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salami Sniper - Fraction Precision</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fugaz+One&family=Open+Sans:wght@600;800&display=swap');
+
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background-color: #2b2d42;
+            color: white;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        .cartoon-font {
+            font-family: 'Fugaz One', cursive;
+        }
+
+        .salami-gradient {
+            background: linear-gradient(to bottom, #ef233c, #d90429);
+            border: 4px solid #8d1a2d;
+            box-shadow: inset 0 10px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .fat-blob {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            position: absolute;
+        }
+
+        .blade-line {
+            width: 4px;
+            height: 120%;
+            background: #edf2f4;
+            position: absolute;
+            top: -10%;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            transition: left 0.1s ease-out;
+        }
+
+        .btn-push {
+            transition: all 0.1s;
+            box-shadow: 0 8px 0 #b91c1c;
+        }
+
+        .btn-push:active {
+            transform: translateY(4px);
+            box-shadow: 0 4px 0 #b91c1c;
+        }
+
+        #accuracy-meter {
+            height: 12px;
+            background: #4a4e69;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #accuracy-fill {
+            height: 100%;
+            width: 0%;
+            background: #06d6a0;
+            transition: width 0.3s;
+        }
+
+        .shake {
+            animation: shake 0.3s ease-in-out;
+        }
+
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-5px);
+            }
+
+            75% {
+                transform: translateX(5px);
+            }
+        }
+    </style>
+</head>
+
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <!-- Game Header -->
+    <div class="text-center mb-8">
+        <h1 class="cartoon-font text-4xl text-yellow-400 italic tracking-tighter uppercase">SALAMI SNIPER</h1>
+        <div class="flex items-center justify-center gap-2 mt-2">
+            <span class="bg-red-600 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest">Stage 2:
+                Precision</span>
+            <div class="bg-white/10 px-3 py-1 rounded-full text-xs font-bold">
+                STREAK: <span id="streak-val" class="text-yellow-400">0</span>/5
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Game Area -->
+    <div class="w-full max-w-2xl bg-slate-800 rounded-[3rem] p-8 border-8 border-slate-900 shadow-2xl relative">
+
+        <!-- Target Instruction -->
+        <div class="text-center mb-10">
+            <p class="text-slate-400 font-bold uppercase tracking-widest text-sm">Customer Order:</p>
+            <h2 class="cartoon-font text-5xl">SLICE INTO <span id="target-parts" class="text-cyan-400">3</span></h2>
+            <p class="text-cyan-400/60 text-xs font-bold mt-1 tracking-widest">ALL PIECES MUST BE EQUAL SIZE!</p>
+        </div>
+
+        <!-- The Salami Bar -->
+        <div class="relative h-24 mb-16 px-1">
+            <div id="salami"
+                class="salami-gradient w-full h-full rounded-full relative overflow-hidden flex items-center">
+                <!-- Fat Blobs (Decoration) -->
+                <div class="fat-blob w-4 h-4 left-10 top-4"></div>
+                <div class="fat-blob w-3 h-3 left-40 bottom-6"></div>
+                <div class="fat-blob w-5 h-5 right-20 top-8"></div>
+                <div class="fat-blob w-2 h-2 left-1/2 top-10"></div>
+
+                <!-- Cuts Container -->
+                <div id="cuts-container" class="absolute inset-0">
+                    <!-- Lines injected here -->
+                </div>
+            </div>
+
+            <!-- Labels for start/end -->
+            <div class="absolute -bottom-8 left-0 text-xs font-black text-slate-500">START (0)</div>
+            <div class="absolute -bottom-8 right-0 text-xs font-black text-slate-500">WHOLE (1)</div>
+        </div>
+
+        <!-- Control Area -->
+        <div class="space-y-8">
+            <div class="px-4">
+                <label
+                    class="block text-center text-xs font-black uppercase text-slate-400 mb-4 tracking-tighter">Adjust
+                    Blade Spacing</label>
+                <input type="range" id="cut-slider" min="0.05" max="0.95" step="0.001" value="0.5"
+                    class="w-full h-4 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+            </div>
+
+            <div class="flex flex-col items-center gap-4">
+                <button id="slice-btn"
+                    class="btn-push bg-red-600 w-full py-6 rounded-2xl cartoon-font text-3xl text-white tracking-widest hover:brightness-110">
+                    S-S-SLICE IT!
+                </button>
+                <div class="w-full">
+                    <div class="flex justify-between text-[10px] font-black uppercase text-slate-500 mb-1">
+                        <span>Precision Meter</span>
+                        <span id="accuracy-text">READY</span>
+                    </div>
+                    <div id="accuracy-meter">
+                        <div id="accuracy-fill"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Message Area -->
+    <div id="hint-box" class="mt-6 text-center h-12">
+        <p id="hint-text" class="text-slate-400 italic font-medium">Drag the slider to find the perfect slice width.</p>
+    </div>
+
+    <script>
+        const slider = document.getElementById('cut-slider');
+        const cutsContainer = document.getElementById('cuts-container');
+        const targetText = document.getElementById('target-parts');
+        const sliceBtn = document.getElementById('slice-btn');
+        const streakText = document.getElementById('streak-val');
+        const accuracyFill = document.getElementById('accuracy-fill');
+        const accuracyText = document.getElementById('accuracy-text');
+        const hintText = document.getElementById('hint-text');
+
+        let targetN = 3;
+        let streak = 0;
+        let isProcessing = false;
+
+        function initLevel() {
+            // Pick a denominator from 2 to 8
+            targetN = Math.floor(Math.random() * 7) + 2;
+            targetText.innerText = targetN;
+            slider.value = 1 / (targetN + (Math.random() - 0.5)); // Start near-ish
+            updateCuts();
+            hintText.innerText = `To get ${targetN} pieces, how wide should one slice be?`;
+            hintText.className = "text-slate-400 italic font-medium";
+            accuracyFill.style.width = '0%';
+            accuracyText.innerText = 'READY';
+            isProcessing = false;
+            sliceBtn.disabled = false;
+            sliceBtn.innerText = "S-S-SLICE IT!";
+        }
+
+        function updateCuts() {
+            if (isProcessing) return;
+            const sliceWidth = parseFloat(slider.value);
+            cutsContainer.innerHTML = '';
+
+            // We want to see how many slices fit in the 1.0 container
+            // The number of cuts for N pieces is N-1.
+            // But here, the learner is adjusting the spacing.
+            // We show cuts at intervals of 'sliceWidth'
+            let currentPos = sliceWidth;
+            let count = 0;
+            while (currentPos < 1 && count < 20) {
+                const line = document.createElement('div');
+                line.className = 'blade-line';
+                line.style.left = (currentPos * 100) + '%';
+                cutsContainer.appendChild(line);
+                currentPos += sliceWidth;
+                count++;
+            }
+        }
+
+        function handleSlice() {
+            if (isProcessing) return;
+            isProcessing = true;
+            sliceBtn.disabled = true;
+
+            const userWidth = parseFloat(slider.value);
+            const idealWidth = 1 / targetN;
+
+            // Calculate error as a percentage of the ideal width
+            const error = Math.abs(userWidth - idealWidth) / idealWidth;
+            const accuracy = Math.max(0, 100 - (error * 500)); // Very sensitive!
+
+            accuracyFill.style.width = accuracy + '%';
+
+            if (accuracy > 92) {
+                // Success
+                streak++;
+                accuracyText.innerText = "PERFECT CUT!";
+                accuracyFill.style.backgroundColor = "#06d6a0";
+                sliceBtn.innerText = "NAILED IT!";
+                hintText.innerText = "That is some Grade-A slicing!";
+                hintText.className = "text-green-400 font-bold uppercase";
+
+                setTimeout(() => {
+                    if (streak >= 5) {
+                        winGame();
+                    } else {
+                        initLevel();
+                    }
+                }, 1500);
+            } else {
+                // Fail
+                streak = 0;
+                accuracyText.innerText = accuracy < 50 ? "MESSY!" : "ALMOST...";
+                accuracyFill.style.backgroundColor = "#ef233c";
+                document.querySelector('.w-full.max-w-2xl').classList.add('shake');
+
+                const tooThin = userWidth < idealWidth;
+                hintText.innerText = tooThin
+                    ? `Oops! Those slices are too thin. You ended up with MORE than ${targetN} pieces.`
+                    : `Wait! Those slices are too wide. You couldn't fit all ${targetN} pieces.`;
+                hintText.className = "text-red-400 font-bold";
+
+                setTimeout(() => {
+                    document.querySelector('.w-full.max-w-2xl').classList.remove('shake');
+                    isProcessing = false;
+                    sliceBtn.disabled = false;
+                    sliceBtn.innerText = "TRY AGAIN";
+                }, 1500);
+            }
+
+            streakText.innerText = streak;
+        }
+
+        function winGame() {
+            document.body.innerHTML = `
+                <div class="text-center animate-bounce">
+                    <h1 class="cartoon-font text-6xl text-yellow-400 mb-4">DELI MASTER!</h1>
+                    <p class="text-xl font-bold">You've mastered the Denominator.</p>
+                    <button onclick="location.reload()" class="mt-8 bg-white text-black px-8 py-4 rounded-full font-black uppercase">Next Game: The Unit Collector</button>
+                </div>
+            `;
+        }
+
+        slider.addEventListener('input', updateCuts);
+        sliceBtn.addEventListener('click', handleSlice);
+
+        window.onload = initLevel;
+    </script>
+</body>
+
+</html>

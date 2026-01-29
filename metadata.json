@@ -1,0 +1,5 @@
+{
+  "name": "MathFlix",
+  "description": "A Netflix-style streaming platform for interactive math games, coding challenges, and educational content. Features an admin dashboard, subscription model, and AI-powered math assistance.",
+  "requestFramePermissions": []
+}

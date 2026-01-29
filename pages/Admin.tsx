@@ -1,0 +1,421 @@
+import React, { useState, useEffect } from 'react';
+import { Navbar } from '../components/Navbar';
+import { getUserProfile, saveGame } from '../services/gameService';
+import { Category, Game, UserProfile } from '../types';
+import { Button } from '../components/Button';
+import { useNavigate } from 'react-router-dom';
+import { GoogleGenAI } from "@google/genai";
+import { Sparkles, Wand2, CreditCard, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
+import { getPendingPayments, approvePayment, rejectPayment, PaymentRequest } from '../services/paymentService';
+
+export const Admin: React.FC = () => {
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
+  const navigate = useNavigate();
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'games' | 'payments'>('payments');
+
+  // Payment requests state
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const profile = await getUserProfile();
+        setUser(profile);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingUser(false);
+      }
+    };
+    loadUser();
+  }, []);
+
+  useEffect(() => {
+    if (user?.isAdmin && activeTab === 'payments') {
+      loadPayments();
+    }
+  }, [user, activeTab]);
+
+  const loadPayments = async () => {
+    setLoadingPayments(true);
+    try {
+      const { requests } = await getPendingPayments();
+      setPaymentRequests(requests);
+    } catch (err) {
+      console.error(err);
+    }
+    setLoadingPayments(false);
+  };
+
+  const handleApprove = async (id: string) => {
+    setProcessingId(id);
+    try {
+      await approvePayment(id);
+      setPaymentRequests(prev => prev.filter(r => r.id !== id));
+    } catch (err: any) {
+      alert(err.message);
+    }
+    setProcessingId(null);
+  };
+
+  const handleReject = async (id: string) => {
+    const notes = prompt('Rejection reason (optional):');
+    setProcessingId(id);
+    try {
+      await rejectPayment(id, notes || undefined);
+      setPaymentRequests(prev => prev.filter(r => r.id !== id));
+    } catch (err: any) {
+      alert(err.message);
+    }
+    setProcessingId(null);
+  };
+
+  // Form State
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState<Category>(Category.MATH);
+  const [grade, setGrade] = useState('');
+  const [topics, setTopics] = useState('');
+  const [subtopics, setSubtopics] = useState('');
+  const [thumbnailUrl, setThumbnailUrl] = useState('https://picsum.photos/400/225');
+  const [isPremium, setIsPremium] = useState(false);
+  const [gameCode, setGameCode] = useState('');
+
+  // AI Generation State
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const newGame: Game = {
+      id: Date.now().toString(),
+      title,
+      description,
+      category,
+      grade,
+      topics: topics.split(',').map(t => t.trim()),
+      subtopics: subtopics.split(',').map(s => s.trim()),
+      thumbnailUrl,
+      type: 'html',
+      content: gameCode,
+      isPremium,
+      views: 0
+    };
+
+    saveGame(newGame);
+    alert('Game Added Successfully!');
+    navigate('/');
+  };
+
+  const handleGenerateWithAI = async () => {
+    if (!topics || !grade || !category) {
+      alert("Please fill in Category, Grade, and Topics first to guide the AI.");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      // Use the key provided or process.env
+      const apiKey = process.env.API_KEY || 'AIzaSyDXEpcD1Ht9Dkd3pfwVVahV4s-xYOse2rA';
+      const ai = new GoogleGenAI({ apiKey });
+
+      const prompt = `Write a complete, single-file HTML5 game with embedded CSS and JavaScript for a student in ${grade} learning about ${topics} (specifically ${subtopics || 'general concepts'}). 
+      Category: ${category}.
+      The game should be interactive, visually appealing (use bright colors), and educational. 
+      It must verify user answers and keep score. 
+      The code must be strictly self-contained in a single HTML string (start with <!DOCTYPE html>). 
+      Do not use external CSS/JS files.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+      });
+
+      const generatedCode = response.text;
+      if (generatedCode) {
+        // Simple cleanup if the model wraps code in markdown blocks
+        const cleanCode = generatedCode.replace(/```html/g, '').replace(/```/g, '');
+        setGameCode(cleanCode);
+
+        if (!title) setTitle(`AI Generated: ${topics} Game`);
+        if (!description) setDescription(`An interactive ${category} game about ${topics} generated by Gemini AI.`);
+      } else {
+        alert("AI generated empty content.");
+      }
+    } catch (error) {
+      console.error("AI Generation Error:", error);
+      alert("Failed to generate game with AI. Check API Key or Try again.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  if (loadingUser) {
+    return <div className="min-h-screen bg-[#141414] text-white flex items-center justify-center">Loading...</div>;
+  }
+
+  if (!user || !user.isAdmin) {
+    return (
+      <div className="min-h-screen bg-[#141414] text-white flex items-center justify-center flex-col gap-4">
+        <h1 className="text-3xl font-bold">Access Denied</h1>
+        <p>You must be an administrator to access this page.</p>
+        <Button onClick={() => navigate('/')}>Return Home</Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-[#141414] pb-20">
+      <Navbar user={user} />
+
+      <div className="max-w-4xl mx-auto mt-24 px-6">
+        <h1 className="text-3xl font-bold mb-8 text-white">Admin Dashboard</h1>
+
+        {/* Tabs */}
+        <div className="flex gap-4 mb-8 border-b border-gray-700">
+          <button
+            onClick={() => setActiveTab('payments')}
+            className={`pb-3 px-4 font-semibold transition-colors flex items-center gap-2 ${activeTab === 'payments'
+                ? 'text-red-500 border-b-2 border-red-500'
+                : 'text-gray-400 hover:text-white'
+              }`}
+          >
+            <CreditCard size={18} />
+            Payment Requests
+            {paymentRequests.length > 0 && (
+              <span className="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">
+                {paymentRequests.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('games')}
+            className={`pb-3 px-4 font-semibold transition-colors flex items-center gap-2 ${activeTab === 'games'
+                ? 'text-red-500 border-b-2 border-red-500'
+                : 'text-gray-400 hover:text-white'
+              }`}
+          >
+            <Sparkles size={18} />
+            Add Game
+          </button>
+        </div>
+
+        {/* Payment Requests Tab */}
+        {activeTab === 'payments' && (
+          <div className="bg-[#1f1f1f] rounded-lg p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-white">Pending Payment Requests</h2>
+              <button
+                onClick={loadPayments}
+                className="text-sm text-blue-400 hover:text-blue-300"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {loadingPayments ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="animate-spin text-white" size={32} />
+              </div>
+            ) : paymentRequests.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">
+                <Clock size={48} className="mx-auto mb-4 opacity-50" />
+                <p>No pending payment requests</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {paymentRequests.map(req => (
+                  <div
+                    key={req.id}
+                    className="bg-[#2a2a2a] rounded-lg p-4 border border-gray-700"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-semibold text-white">{req.userName}</h3>
+                        <p className="text-sm text-gray-400">{req.userEmail}</p>
+                        <div className="mt-2 text-sm">
+                          <p className="text-gray-300">
+                            <span className="text-gray-500">Transaction ID:</span>{' '}
+                            <code className="bg-gray-700 px-2 py-0.5 rounded">{req.transactionId}</code>
+                          </p>
+                          <p className="text-gray-500 mt-1">
+                            Submitted: {new Date(req.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-green-400">₹{req.amount}</p>
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            onClick={() => handleApprove(req.id)}
+                            disabled={processingId === req.id}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 transition disabled:opacity-50 text-sm font-medium"
+                          >
+                            {processingId === req.id ? (
+                              <Loader2 className="animate-spin" size={14} />
+                            ) : (
+                              <CheckCircle size={14} />
+                            )}
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleReject(req.id)}
+                            disabled={processingId === req.id}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 transition disabled:opacity-50 text-sm font-medium"
+                          >
+                            <XCircle size={14} />
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Add Game Tab */}
+        {activeTab === 'games' && (
+          <form onSubmit={handleSubmit} className="bg-[#1f1f1f] p-8 rounded-lg shadow-xl space-y-6">
+
+            <div>
+              <label className="block text-sm font-bold text-gray-400 mb-2">Game Title</label>
+              <input
+                required
+                type="text"
+                className="w-full bg-[#333] border border-transparent focus:border-red-600 rounded p-3 text-white outline-none transition"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="e.g. Advanced Calculus Quiz"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-400 mb-2">Description</label>
+              <textarea
+                required
+                className="w-full bg-[#333] border border-transparent focus:border-red-600 rounded p-3 text-white outline-none transition h-24"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="Short description for the game card..."
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-400 mb-2">Category</label>
+                <select
+                  className="w-full bg-[#333] border border-transparent focus:border-red-600 rounded p-3 text-white outline-none transition"
+                  value={category}
+                  onChange={e => setCategory(e.target.value as Category)}
+                >
+                  {Object.values(Category).filter(c => c !== Category.FEATURED).map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-400 mb-2">Grade Level</label>
+                <input
+                  required
+                  type="text"
+                  className="w-full bg-[#333] border border-transparent focus:border-red-600 rounded p-3 text-white outline-none transition"
+                  value={grade}
+                  onChange={e => setGrade(e.target.value)}
+                  placeholder="e.g. Grade 5, High School, All Ages"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-400 mb-2">Topics (comma separated)</label>
+                <input
+                  required
+                  type="text"
+                  className="w-full bg-[#333] border border-transparent focus:border-red-600 rounded p-3 text-white outline-none transition"
+                  value={topics}
+                  onChange={e => setTopics(e.target.value)}
+                  placeholder="e.g. Algebra, Linear Equations"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-400 mb-2">Subtopics (comma separated)</label>
+                <input
+                  required
+                  type="text"
+                  className="w-full bg-[#333] border border-transparent focus:border-red-600 rounded p-3 text-white outline-none transition"
+                  value={subtopics}
+                  onChange={e => setSubtopics(e.target.value)}
+                  placeholder="e.g. Solving for X, Graphing"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-400 mb-2">Thumbnail URL</label>
+              <input
+                type="text"
+                className="w-full bg-[#333] border border-transparent focus:border-red-600 rounded p-3 text-white outline-none transition"
+                value={thumbnailUrl}
+                onChange={e => setThumbnailUrl(e.target.value)}
+                placeholder="https://..."
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-5 h-5 accent-red-600"
+                  checked={isPremium}
+                  onChange={e => setIsPremium(e.target.checked)}
+                />
+                <span className="text-white font-semibold">Premium Exclusive (Subscription Required)</span>
+              </label>
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-bold text-gray-400">Game HTML/Embed Code</label>
+                <button
+                  type="button"
+                  onClick={handleGenerateWithAI}
+                  disabled={isGenerating}
+                  className="flex items-center gap-2 text-indigo-400 hover:text-indigo-300 text-sm font-semibold transition disabled:opacity-50"
+                >
+                  <Wand2 size={16} />
+                  {isGenerating ? 'Gemini is Thinking...' : 'Auto-Generate with Gemini AI'}
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500 mb-2">Paste the full HTML content, including &lt;style&gt; and &lt;script&gt; tags.</p>
+              <textarea
+                required
+                className="w-full bg-[#333] border border-transparent focus:border-red-600 rounded p-3 text-white font-mono text-sm outline-none transition h-64"
+                value={gameCode}
+                onChange={e => setGameCode(e.target.value)}
+                placeholder="<!DOCTYPE html><html><body>...</body></html>"
+              />
+            </div>
+
+            <div className="pt-4">
+              <Button type="submit" size="lg" className="w-full">
+                Publish to MathFlix
+              </Button>
+            </div>
+
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};

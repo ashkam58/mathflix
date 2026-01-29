@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Powerpuff Girls: Chemical X Missions</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fatface&family=Inter:wght@400;700&display=swap');
+
+        :root {
+            --ppg-pink: #ffadd2;
+            --ppg-blue: #ade2ff;
+            --ppg-green: #b2ffad;
+            --ppg-black: #1a1a1a;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0fdf4;
+            /* Professor's Lab Green */
+            color: var(--ppg-black);
+            touch-action: manipulation;
+        }
+
+        .ppg-header {
+            background-color: var(--ppg-black);
+            color: white;
+            border-bottom: 8px solid #22c55e;
+        }
+
+        .beaker-container {
+            background: white;
+            border: 4px solid var(--ppg-black);
+            border-radius: 30px;
+            box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.1);
+        }
+
+        .grid-pixel {
+            width: 15px;
+            height: 15px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .grid-pixel.active {
+            background-color: #22c55e;
+            box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.5);
+        }
+
+        .factor-node {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.8rem;
+            border: 2px solid var(--ppg-black);
+            background: #f3f4f6;
+            transition: all 0.3s;
+        }
+
+        .factor-node.found {
+            background: #b2ffad;
+            transform: scale(1.1);
+        }
+
+        .rainbow-arc {
+            position: absolute;
+            border: 3px solid #22c55e;
+            border-bottom: 0;
+            border-radius: 50% 50% 0 0;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        .btn-ppg {
+            background: var(--ppg-black);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 99px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .btn-ppg:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+
+        .btn-ppg:active {
+            transform: translateY(0);
+        }
+
+        .btn-ppg:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .mission-badge {
+            background: #22c55e;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 5px;
+            font-size: 0.7rem;
+            font-weight: 800;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen pb-10">
+
+    <header class="ppg-header p-4 flex justify-between items-center">
+        <div>
+            <h1 class="text-xl font-black italic">UTONIUM LABS</h1>
+            <p class="text-[10px] uppercase tracking-widest text-green-400 font-bold">Chemical X Quality Control</p>
+        </div>
+        <div id="mission-counter" class="mission-badge">MISSION 1/4</div>
+    </header>
+
+    <div class="max-w-xl mx-auto px-4 mt-6">
+
+        <!-- Professor's Briefing -->
+        <div class="bg-white border-4 border-black p-4 rounded-2xl mb-6 shadow-[4px_4px_0_black] flex gap-4">
+            <div
+                class="w-16 h-16 bg-gray-200 rounded-full border-2 border-black flex-shrink-0 flex items-center justify-center text-3xl">
+                👨‍🔬</div>
+            <div>
+                <h2 id="mission-title" class="font-bold text-lg leading-tight text-green-700">Batch #12</h2>
+                <p id="mission-desc" class="text-xs text-gray-600">"Stabilize this batch by finding all rectangles with
+                    an area of 12."</p>
+            </div>
+        </div>
+
+        <!-- The Workspace -->
+        <div class="beaker-container p-5 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <div id="dim-display" class="text-xl font-black italic text-green-600">1 × 1 = 1</div>
+                <div id="status-light" class="w-4 h-4 rounded-full bg-red-500 shadow-lg"></div>
+            </div>
+
+            <div
+                class="flex justify-center bg-green-50 rounded-xl border-2 border-dashed border-green-200 h-48 items-center overflow-hidden mb-6">
+                <div id="rect-visual" class="grid gap-1 transition-all duration-300"></div>
+            </div>
+
+            <!-- Controls -->
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="space-y-2">
+                    <label class="text-[10px] font-black uppercase text-gray-400">Width: <span id="w-val"
+                            class="text-green-600">1</span></label>
+                    <input type="range" id="w-slider" min="1" max="40" value="1" class="w-full accent-green-600">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-[10px] font-black uppercase text-gray-400">Height: <span id="h-val"
+                            class="text-green-600">1</span></label>
+                    <input type="range" id="h-slider" min="1" max="40" value="1" class="w-full accent-green-600">
+                </div>
+            </div>
+
+            <button id="stamp-btn" class="btn-ppg w-full uppercase text-sm tracking-widest" disabled>
+                Log Molecular Pair
+            </button>
+        </div>
+
+        <!-- Progress Rainbow -->
+        <div class="bg-white border-4 border-black p-5 rounded-2xl shadow-[4px_4px_0_black] relative">
+            <h3 class="text-xs font-black mb-6 uppercase text-gray-400 tracking-tighter">Stability Rainbow</h3>
+            <div id="rainbow-nodes" class="flex justify-between relative z-10 px-2"></div>
+            <div id="rainbow-arcs" class="absolute inset-0 pointer-events-none"></div>
+        </div>
+    </div>
+
+    <!-- Question Overlay -->
+    <div id="question-modal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-6 hidden">
+        <div class="bg-white border-8 border-green-500 rounded-3xl p-6 max-w-sm w-full">
+            <div class="text-4xl mb-2">💡</div>
+            <h2 class="text-xl font-black mb-4 uppercase">Professor's Quiz</h2>
+            <p id="question-text" class="text-sm font-medium mb-6 text-gray-700"></p>
+            <div id="options-container" class="space-y-3"></div>
+        </div>
+    </div>
+
+    <script>
+        const missions = [
+            {
+                target: 12,
+                factors: [1, 2, 3, 4, 6, 12],
+                desc: "A small batch of Chemical X. How many ways can we pack it?",
+                question: "Wait! If 3 × 4 works, does that mean 4 × 3 is also a pair?",
+                options: ["Yes, factors come in pairs!", "No, only one of them counts."],
+                correct: 0
+            },
+            {
+                target: 16,
+                factors: [1, 2, 4, 8, 16],
+                desc: "This batch is special. Try to find a shape where Width and Height are the same!",
+                question: "We found a 4 × 4 structure. What do we call a number like 16?",
+                options: ["A Circle Number", "A Square Number", "A Prime Number"],
+                correct: 1
+            },
+            {
+                target: 13,
+                factors: [1, 13],
+                desc: "The 'Stubborn Batch'. No matter how you try, it won't form a thick rectangle...",
+                question: "13 only has ONE pair (1 and 13). What kind of number is this?",
+                options: ["Composite", "Even", "Prime"],
+                correct: 2
+            },
+            {
+                target: 36,
+                factors: [1, 2, 3, 4, 6, 9, 12, 18, 36],
+                desc: "Massive Batch! Does a bigger number always have more factors?",
+                question: "36 is bigger than 13 and has more factors. Is a bigger number ALWAYS guaranteed to have more factors?",
+                options: ["Yes, bigger equals more!", "No, even huge numbers can be prime."],
+                correct: 1
+            }
+        ];
+
+        let currentMissionIdx = 0;
+        let foundPairs = new Set();
+        let target, factors, pairsToFind;
+
+        const wSlider = document.getElementById('w-slider');
+        const hSlider = document.getElementById('h-slider');
+        const stampBtn = document.getElementById('stamp-btn');
+        const rectVisual = document.getElementById('rect-visual');
+        const nodesContainer = document.getElementById('rainbow-nodes');
+        const arcsContainer = document.getElementById('rainbow-arcs');
+
+        function loadMission(idx) {
+            const m = missions[idx];
+            target = m.target;
+            factors = m.factors;
+            pairsToFind = Math.ceil(factors.length / 2);
+            foundPairs.clear();
+
+            document.getElementById('mission-title').textContent = `Batch #${target}`;
+            document.getElementById('mission-desc').textContent = m.desc;
+            document.getElementById('mission-counter').textContent = `MISSION ${idx + 1}/${missions.length}`;
+
+            // Reset UI
+            nodesContainer.innerHTML = '';
+            arcsContainer.innerHTML = '';
+            factors.forEach(f => {
+                const node = document.createElement('div');
+                node.className = 'factor-node';
+                node.id = `node-${f}`;
+                node.textContent = f;
+                nodesContainer.appendChild(node);
+            });
+            updateUI();
+        }
+
+        function updateUI() {
+            const w = parseInt(wSlider.value);
+            const h = parseInt(hSlider.value);
+            const area = w * h;
+
+            document.getElementById('w-val').textContent = w;
+            document.getElementById('h-val').textContent = h;
+            document.getElementById('dim-display').textContent = `${w} × ${h} = ${area}`;
+
+            rectVisual.style.gridTemplateColumns = `repeat(${w}, 1fr)`;
+            rectVisual.innerHTML = '';
+            for (let i = 0; i < Math.min(area, 100); i++) {
+                const p = document.createElement('div');
+                p.className = 'grid-pixel active';
+                rectVisual.appendChild(p);
+            }
+
+            const light = document.getElementById('status-light');
+            if (area === target) {
+                light.className = 'w-4 h-4 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e]';
+                stampBtn.disabled = false;
+                stampBtn.textContent = "STABILIZE PAIR!";
+            } else {
+                light.className = 'w-4 h-4 rounded-full bg-red-500 opacity-50';
+                stampBtn.disabled = true;
+                stampBtn.textContent = area > target ? "TOO HEAVY!" : "TOO LIGHT!";
+            }
+        }
+
+        function stamp() {
+            const w = parseInt(wSlider.value);
+            const h = parseInt(hSlider.value);
+            const pairKey = [w, h].sort((a, b) => a - b).join('-');
+
+            if (foundPairs.has(pairKey)) return;
+            foundPairs.add(pairKey);
+
+            document.getElementById(`node-${w}`).classList.add('found');
+            document.getElementById(`node-${h}`).classList.add('found');
+            drawArc(w, h);
+
+            if (foundPairs.size >= pairsToFind) {
+                setTimeout(showQuestion, 800);
+            }
+        }
+
+        function drawArc(f1, f2) {
+            const n1 = document.getElementById(`node-${f1}`);
+            const n2 = document.getElementById(`node-${f2}`);
+            const box = nodesContainer.getBoundingClientRect();
+            const r1 = n1.getBoundingClientRect();
+            const r2 = n2.getBoundingClientRect();
+
+            const x1 = (r1.left + r1.width / 2) - box.left;
+            const x2 = (r2.left + r2.width / 2) - box.left;
+            const startX = Math.min(x1, x2);
+            const width = Math.abs(x1 - x2);
+
+            const arc = document.createElement('div');
+            arc.className = 'rainbow-arc';
+            arc.style.left = `${startX + 10}px`;
+            arc.style.width = `${width}px`;
+            arc.style.height = `${width / 3 + 10}px`;
+            arc.style.bottom = `25px`;
+            arcsContainer.appendChild(arc);
+        }
+
+        function showQuestion() {
+            const m = missions[currentMissionIdx];
+            document.getElementById('question-text').textContent = m.question;
+            const container = document.getElementById('options-container');
+            container.innerHTML = '';
+
+            m.options.forEach((opt, i) => {
+                const b = document.createElement('button');
+                b.className = 'w-full text-left p-3 border-2 border-black rounded-xl font-bold hover:bg-green-50 text-sm';
+                b.textContent = opt;
+                b.onclick = () => checkAnswer(i);
+                container.appendChild(b);
+            });
+            document.getElementById('question-modal').classList.remove('hidden');
+        }
+
+        function checkAnswer(idx) {
+            if (idx === missions[currentMissionIdx].correct) {
+                document.getElementById('question-modal').classList.add('hidden');
+                currentMissionIdx++;
+                if (currentMissionIdx < missions.length) {
+                    loadMission(currentMissionIdx);
+                } else {
+                    alert("ULTIMATE STABILITY ACHIEVED! The city of Townsville is saved!");
+                    location.reload();
+                }
+            } else {
+                alert("Incorrect! Professor Utonium suggests checking your data again.");
+            }
+        }
+
+        wSlider.addEventListener('input', updateUI);
+        hSlider.addEventListener('input', updateUI);
+        stampBtn.addEventListener('click', stamp);
+
+        loadMission(0);
+    </script>
+</body>
+
+</html>

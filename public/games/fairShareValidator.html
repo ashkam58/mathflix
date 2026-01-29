@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfect Pizza Factory - Fair Share Validator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bungee&family=Quicksand:wght@500;700&display=swap');
+
+        :root {
+            --factory-red: #ff4757;
+            --factory-yellow: #ffa502;
+            --factory-green: #2ed573;
+            --factory-blue: #1e90ff;
+        }
+
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background-color: #f1f2f6;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .title-font {
+            font-family: 'Bungee', cursive;
+        }
+
+        .pizza-container {
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .success-pop {
+            animation: pop 0.5s ease-out forwards;
+        }
+
+        .fail-wiggle {
+            animation: wiggle 0.4s ease-in-out;
+        }
+
+        @keyframes pop {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.15);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes wiggle {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-10px) rotate(-2deg);
+            }
+
+            75% {
+                transform: translateX(10px) rotate(2deg);
+            }
+        }
+
+        .btn-hover {
+            transition: all 0.2s ease;
+        }
+
+        .btn-hover:active {
+            transform: scale(0.95);
+        }
+
+        .streak-counter {
+            background: white;
+            border: 4px solid #2f3542;
+            box-shadow: 4px 4px 0px #2f3542;
+        }
+
+        #feedback-toast {
+            transition: transform 0.3s, opacity 0.3s;
+        }
+    </style>
+</head>
+
+<body class="flex flex-center justify-center items-center min-h-screen">
+
+    <div id="game-container" class="max-w-md w-full p-6 space-y-6 flex flex-col items-center">
+
+        <!-- Header -->
+        <div class="text-center w-full">
+            <h1 class="title-font text-3xl text-slate-800 tracking-wider">PIZZA FACTORY</h1>
+            <p class="text-slate-500 font-bold uppercase text-sm tracking-widest">Quality Control Dept.</p>
+        </div>
+
+        <!-- Stats Bar -->
+        <div class="flex justify-between w-full items-center">
+            <div class="streak-counter px-4 py-2 rounded-xl">
+                <span class="text-xs font-bold text-slate-400 block uppercase">Streak</span>
+                <span id="current-streak" class="text-2xl title-font text-slate-800">0</span>
+            </div>
+            <div class="streak-counter px-4 py-2 rounded-xl border-blue-500">
+                <span class="text-xs font-bold text-slate-400 block uppercase">Target</span>
+                <span class="text-2xl title-font text-blue-500">10</span>
+            </div>
+        </div>
+
+        <!-- The Quality Control Box -->
+        <div
+            class="relative bg-white w-full aspect-square rounded-3xl border-8 border-slate-800 shadow-[8px_8px_0px_#2f3542] flex items-center justify-center overflow-hidden">
+            <!-- Conveyor Belt Background effect -->
+            <div class="absolute inset-0 opacity-5 pointer-events-none"
+                style="background-image: repeating-linear-gradient(45deg, #000 0, #000 20px, transparent 20px, transparent 40px);">
+            </div>
+
+            <!-- Shape Display -->
+            <div id="shape-stage" class="pizza-container w-64 h-64 relative z-10 flex items-center justify-center">
+                <!-- SVG injected here -->
+            </div>
+
+            <!-- Feedback Overlay -->
+            <div id="feedback-overlay"
+                class="absolute inset-0 z-20 pointer-events-none flex items-center justify-center opacity-0">
+                <div id="feedback-toast" class="px-6 py-3 rounded-2xl title-font text-xl text-white shadow-lg">
+                    PERFECT!
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center h-8">
+            <p id="hint-text" class="text-slate-400 font-medium italic"></p>
+        </div>
+
+        <!-- Action Controls -->
+        <div class="grid grid-cols-2 gap-4 w-full">
+            <button onclick="handleGuess(false)"
+                class="btn-hover bg-factory-red text-white border-b-8 border-red-700 py-6 rounded-2xl title-font text-2xl hover:brightness-110 active:border-b-0 active:mt-2">
+                NO ❌
+                <span class="block text-xs opacity-70 mt-1 font-sans">BROKEN</span>
+            </button>
+            <button onclick="handleGuess(true)"
+                class="btn-hover bg-factory-green text-white border-b-8 border-green-700 py-6 rounded-2xl title-font text-2xl hover:brightness-110 active:border-b-0 active:mt-2">
+                YES ✅
+                <span class="block text-xs opacity-70 mt-1 font-sans">FAIR</span>
+            </button>
+        </div>
+
+        <!-- Progress Tracker -->
+        <div class="w-full bg-slate-200 h-4 rounded-full overflow-hidden border-2 border-slate-800">
+            <div id="progress-bar" class="bg-blue-500 h-full transition-all duration-500 w-0"></div>
+        </div>
+    </div>
+
+    <script>
+        const shapeStage = document.getElementById('shape-stage');
+        const currentStreakEl = document.getElementById('current-streak');
+        const progressBar = document.getElementById('progress-bar');
+        const hintText = document.getElementById('hint-text');
+        const feedbackOverlay = document.getElementById('feedback-overlay');
+        const feedbackToast = document.getElementById('feedback-toast');
+
+        let currentStreak = 0;
+        let currentProblem = null;
+
+        const SHAPES = ['circle', 'square', 'rectangle', 'hexagon'];
+        const COLORS = ['#FFD93D', '#FF8400', '#FF4E11', '#B71375']; // Pizza tones
+
+        function generateProblem() {
+            const shapeType = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+            const isFair = Math.random() > 0.45; // Slightly favor fairness for flow
+            const parts = 2 + Math.floor(Math.random() * 5); // 2 to 6 parts
+
+            currentProblem = { shapeType, isFair, parts };
+            renderShape(currentProblem);
+            hintText.innerText = "Is every slice the same size?";
+        }
+
+        function renderShape(prob) {
+            const size = 200;
+            const center = size / 2;
+            const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+            let svgContent = '';
+
+            // Base Shape
+            if (prob.shapeType === 'circle') {
+                svgContent += `<circle cx="${center}" cy="${center}" r="90" fill="${color}" stroke="#2f3542" stroke-width="6" />`;
+                svgContent += generateCuts(prob, 'circle', center, 90);
+            } else if (prob.shapeType === 'square') {
+                svgContent += `<rect x="10" y="10" width="180" height="180" fill="${color}" stroke="#2f3542" stroke-width="6" />`;
+                svgContent += generateCuts(prob, 'square', 10, 180);
+            } else if (prob.shapeType === 'rectangle') {
+                svgContent += `<rect x="10" y="50" width="180" height="100" fill="${color}" stroke="#2f3542" stroke-width="6" />`;
+                svgContent += generateCuts(prob, 'rectangle', 10, 180, 50, 100);
+            } else if (prob.shapeType === 'hexagon') {
+                const points = "100,10 190,55 190,145 100,190 10,145 10,55";
+                svgContent += `<polygon points="${points}" fill="${color}" stroke="#2f3542" stroke-width="6" />`;
+                svgContent += generateCuts(prob, 'hexagon', center, 90);
+            }
+
+            shapeStage.innerHTML = `<svg viewBox="0 0 200 200" width="200" height="200">${svgContent}</svg>`;
+        }
+
+        function generateCuts(prob, type, x, w, y, h) {
+            let cuts = '';
+            const isFair = prob.isFair;
+            const n = prob.parts;
+
+            if (type === 'circle' || type === 'hexagon') {
+                // Radial cuts
+                const offset = isFair ? 0 : (Math.random() * 20 + 10);
+                for (let i = 0; i < n; i++) {
+                    let angle = (i * (360 / n)) * (Math.PI / 180);
+                    // Add "trick" by skewing the angle if unfair
+                    if (!isFair && i === 1) angle += 0.5;
+
+                    const x2 = x + Math.cos(angle) * w;
+                    const y2 = x + Math.sin(angle) * w;
+                    cuts += `<line x1="${x}" y1="${x}" x2="${x2}" y2="${y2}" stroke="#2f3542" stroke-width="4" stroke-linecap="round" />`;
+                }
+            } else if (type === 'square' || type === 'rectangle') {
+                const isVertical = Math.random() > 0.5;
+                if (isVertical) {
+                    const step = w / n;
+                    for (let i = 1; i < n; i++) {
+                        let posX = x + (i * step);
+                        if (!isFair && i === 1) posX += (step * 0.4); // Shift line
+                        cuts += `<line x1="${posX}" y1="${y || 10}" x2="${posX}" y2="${(y || 10) + (h || 180)}" stroke="#2f3542" stroke-width="4" />`;
+                    }
+                } else {
+                    const step = (h || 180) / n;
+                    for (let i = 1; i < n; i++) {
+                        let posY = (y || 10) + (i * step);
+                        if (!isFair && i === 1) posY += (step * 0.4);
+                        cuts += `<line x1="${x}" y1="${posY}" x2="${x + w}" y2="${posY}" stroke="#2f3542" stroke-width="4" />`;
+                    }
+                }
+            }
+            return cuts;
+        }
+
+        function handleGuess(userSaysFair) {
+            const correct = (userSaysFair === currentProblem.isFair);
+
+            if (correct) {
+                currentStreak++;
+                showFeedback(true);
+            } else {
+                currentStreak = 0;
+                showFeedback(false);
+            }
+
+            updateUI();
+
+            if (currentStreak >= 10) {
+                congratulate();
+            } else {
+                setTimeout(generateProblem, 600);
+            }
+        }
+
+        function showFeedback(isCorrect) {
+            shapeStage.classList.remove('success-pop', 'fail-wiggle');
+            void shapeStage.offsetWidth; // Trigger reflow
+
+            if (isCorrect) {
+                shapeStage.classList.add('success-pop');
+                feedbackToast.innerText = "FAIR! ✅";
+                feedbackToast.style.backgroundColor = 'var(--factory-green)';
+                hintText.innerText = "Keep it up, Inspector!";
+            } else {
+                shapeStage.classList.add('fail-wiggle');
+                feedbackToast.innerText = "BROKEN! ❌";
+                feedbackToast.style.backgroundColor = 'var(--factory-red)';
+                hintText.innerText = "Check the corners—are they the same size?";
+            }
+
+            feedbackOverlay.style.opacity = '1';
+            feedbackOverlay.style.transform = 'translateY(-20px)';
+
+            setTimeout(() => {
+                feedbackOverlay.style.opacity = '0';
+                feedbackOverlay.style.transform = 'translateY(0)';
+            }, 500);
+        }
+
+        function updateUI() {
+            currentStreakEl.innerText = currentStreak;
+            progressBar.style.width = `${(currentStreak / 10) * 100}%`;
+        }
+
+        function congratulate() {
+            shapeStage.innerHTML = `
+                <div class="text-center">
+                    <div class="text-5xl mb-4">🏆</div>
+                    <p class="title-font text-xl text-green-600">PROMOTED!</p>
+                    <p class="text-xs font-bold text-slate-500 uppercase">You unlocked: Salami Sniper</p>
+                    <button onclick="resetGame()" class="mt-4 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold">REPLAY STAGE 1</button>
+                </div>
+            `;
+            hintText.innerText = "Level 1 Complete!";
+        }
+
+        function resetGame() {
+            currentStreak = 0;
+            updateUI();
+            generateProblem();
+        }
+
+        window.onload = generateProblem;
+    </script>
+</body>
+
+</html>

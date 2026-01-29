@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Phineas & Ferb: Bridge Stabilizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Roboto:wght@400;700&display=swap');
+
+        body {
+            background-color: #87CEEB;
+            /* Sky Blue */
+            font-family: 'Roboto', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(180deg, #87CEEB 0%, #E0F7FA 100%);
+        }
+
+        canvas {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            border-radius: 50%;
+            background-color: #4facfe;
+            /* Water Blue */
+            cursor: crosshair;
+        }
+
+        /* HUD Styling */
+        .hud {
+            position: absolute;
+            top: 10px;
+            width: 95%;
+            max-width: 600px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.9);
+            border: 4px solid #F4A460;
+            /* Wood color */
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+            min-width: 100px;
+            box-shadow: 0 4px 0 #8B4513;
+        }
+
+        .panel h3 {
+            margin: 0;
+            font-family: 'Fredoka One', cursive;
+            color: #d35400;
+            font-size: 1rem;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        /* Instruction Bubble */
+        .instruction {
+            position: absolute;
+            bottom: 30px;
+            background: #fff;
+            padding: 15px 25px;
+            border-radius: 30px;
+            font-family: 'Fredoka One', cursive;
+            color: #e67e22;
+            border: 3px solid #e67e22;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            font-size: 1.2rem;
+            pointer-events: none;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            20%,
+            50%,
+            80%,
+            100% {
+                transform: translateY(0);
+            }
+
+            40% {
+                transform: translateY(-10px);
+            }
+
+            60% {
+                transform: translateY(-5px);
+            }
+        }
+
+        /* Stability Meter */
+        .meter-container {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            border: 2px solid #fff;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .meter-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ff3333, #ffff33, #33ff33);
+            transition: width 0.1s;
+        }
+
+        .meter-label {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-weight: bold;
+            color: #333;
+            text-shadow: 1px 1px 0 #fff;
+            pointer-events: none;
+        }
+
+        /* Win Overlay */
+        #win-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+            z-index: 20;
+        }
+
+        .win-title {
+            font-family: 'Fredoka One', cursive;
+            font-size: 3rem;
+            color: #2ecc71;
+            text-shadow: 3px 3px 0 #fff;
+            margin-bottom: 20px;
+        }
+
+        .win-subtitle {
+            color: white;
+            font-size: 1.5rem;
+            text-align: center;
+            max-width: 80%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <div class="hud">
+            <div class="panel">
+                <h3>Left Side (AM)</h3>
+                <div class="stat-value" id="dist-am">0</div>
+            </div>
+            <div class="panel">
+                <h3>Right Side (MB)</h3>
+                <div class="stat-value" id="dist-mb">0</div>
+            </div>
+        </div>
+
+        <div class="meter-label">BRIDGE STABILITY</div>
+        <div class="meter-container">
+            <div class="meter-fill" id="stability-bar"></div>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="instruction" id="instruction-text">
+            Slide the pillar to 90°!
+        </div>
+
+        <div id="win-screen">
+            <div class="win-title">GREAT JOB!</div>
+            <div class="win-subtitle">
+                The perpendicular line bisected the chord!<br>
+                AM = MB
+            </div>
+            <!-- Simple CSS Perry approximation -->
+            <div
+                style="margin-top:20px; width: 60px; height: 30px; background: #008B8B; border-radius: 5px; position: relative;">
+                <div
+                    style="position: absolute; top: -10px; left: 10px; width: 40px; height: 10px; background: #8B4513;">
+                </div> <!-- Hat -->
+                <div
+                    style="position: absolute; top: 5px; left: 45px; width: 10px; height: 5px; background: orange; border-radius: 50%;">
+                </div> <!-- Bill -->
+            </div>
+            <div style="color: #008B8B; margin-top: 5px; font-weight: bold;">*Chatter noise*</div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const amDisplay = document.getElementById('dist-am');
+        const mbDisplay = document.getElementById('dist-mb');
+        const stabilityBar = document.getElementById('stability-bar');
+        const winScreen = document.getElementById('win-screen');
+        const instructionText = document.getElementById('instruction-text');
+
+        let width, height, cx, cy, radius;
+        let dragging = false;
+        let shakeOffset = 0;
+        let isWin = false;
+
+        // Game Objects
+        let chordY; // Y position of the bridge
+        let chordStartX, chordEndX;
+        let pillarX; // The draggable X coordinate
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            // Limit max size for desktop
+            const size = Math.min(width, height) * 0.9;
+            canvas.width = size;
+            canvas.height = size;
+
+            cx = size / 2;
+            cy = size / 2;
+            radius = size * 0.45;
+
+            // Setup Chord (Bridge) in lower half
+            chordY = cy + radius * 0.5;
+
+            // Calculate start and end X of chord based on circle equation: x^2 + y^2 = r^2
+            // x = sqrt(r^2 - y^2) (relative to center)
+            const yRel = chordY - cy;
+            const xSpan = Math.sqrt(radius * radius - yRel * yRel);
+
+            chordStartX = cx - xSpan;
+            chordEndX = cx + xSpan;
+
+            // Start pillar at a random bad position if not set
+            if (!pillarX) pillarX = chordStartX + (xSpan * 0.5); // Start at 25% across
+
+            draw();
+        }
+
+        window.addEventListener('resize', resize);
+
+        // Interaction
+        function getMousePos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            // Handle both touch and mouse
+            const clientX = evt.clientX || (evt.touches && evt.touches[0].clientX);
+            const clientY = evt.clientY || (evt.touches && evt.touches[0].clientY);
+
+            // Scale factor if canvas logical size differs from display size
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function isTouchingPillar(pos) {
+            // Hitbox around the pillar base (on the chord)
+            return (Math.abs(pos.x - pillarX) < 40 && Math.abs(pos.y - chordY) < 40);
+        }
+
+        function handleStart(e) {
+            if (isWin) return;
+            const pos = getMousePos(e);
+            if (isTouchingPillar(pos)) {
+                dragging = true;
+                instructionText.style.display = 'none';
+            }
+        }
+
+        function handleMove(e) {
+            if (!dragging || isWin) return;
+            e.preventDefault();
+            const pos = getMousePos(e);
+
+            // Constrain X to chord length with some padding
+            pillarX = Math.max(chordStartX + 10, Math.min(chordEndX - 10, pos.x));
+
+            draw();
+        }
+
+        function handleEnd() {
+            dragging = false;
+            checkWin();
+        }
+
+        canvas.addEventListener('mousedown', handleStart);
+        canvas.addEventListener('touchstart', handleStart, { passive: false });
+
+        canvas.addEventListener('mousemove', handleMove);
+        canvas.addEventListener('touchmove', handleMove, { passive: false });
+
+        canvas.addEventListener('mouseup', handleEnd);
+        canvas.addEventListener('touchend', handleEnd);
+
+        // Game Logic
+        function checkWin() {
+            // Center is at cx. If pillarX is near cx, it's perpendicular.
+            const diff = Math.abs(pillarX - cx);
+
+            // 5 pixel tolerance
+            if (diff < 5) {
+                pillarX = cx; // Snap to center
+                isWin = true;
+                draw();
+                winScreen.style.opacity = 1;
+                stabilityBar.style.width = "100%";
+                stabilityBar.style.background = "#33ff33";
+                instructionText.innerText = "Theorem Proved!";
+            }
+        }
+
+        // Animation Loop for Shaking Effect
+        function animate() {
+            if (!isWin) {
+                // Calculate stability percentage based on distance from center
+                const maxDist = (chordEndX - chordStartX) / 2;
+                const currentDist = Math.abs(pillarX - cx);
+                const stability = Math.max(0, 100 - (currentDist / maxDist * 100));
+
+                stabilityBar.style.width = stability + "%";
+
+                // Shake calculation: The further from center, the more it shakes
+                const shakeIntensity = (currentDist / maxDist) * 5;
+                shakeOffset = (Math.random() - 0.5) * shakeIntensity;
+            } else {
+                shakeOffset = 0;
+            }
+
+            draw();
+            requestAnimationFrame(animate);
+        }
+
+        function draw() {
+            // Clear
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Draw Water
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#4facfe';
+            ctx.fill();
+
+            // 2. Draw Center Island (Point O)
+            ctx.beginPath();
+            ctx.arc(cx, cy, 15, 0, Math.PI * 2);
+            ctx.fillStyle = '#2ecc71'; // Grass Green
+            ctx.fill();
+            ctx.strokeStyle = '#27ae60';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Label O
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText("O", cx - 5, cy - 20);
+
+            // 3. Draw The Bridge (Chord) - Apply shake
+            const bridgeY = chordY + shakeOffset;
+
+            ctx.beginPath();
+            ctx.moveTo(chordStartX, bridgeY);
+            ctx.lineTo(chordEndX, bridgeY);
+            ctx.lineWidth = 12;
+            ctx.strokeStyle = '#8B4513'; // SaddleBrown
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Bridge Planks details
+            ctx.beginPath();
+            ctx.setLineDash([10, 10]);
+            ctx.moveTo(chordStartX, bridgeY);
+            ctx.lineTo(chordEndX, bridgeY);
+            ctx.lineWidth = 8;
+            ctx.strokeStyle = '#A0522D'; // Sienna
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Labels A and B
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText("A", chordStartX - 20, bridgeY + 5);
+            ctx.fillText("B", chordEndX + 10, bridgeY + 5);
+
+            // 4. Draw Support Pillar (Line OM)
+            // From Center (cx, cy) to Pillar (pillarX, bridgeY)
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(pillarX, bridgeY);
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = '#95a5a6'; // Metal Grey
+            ctx.stroke();
+
+            // 5. Draw Angle Marker
+            // Calculate angle
+            const dx = pillarX - cx;
+            const dy = bridgeY - cy;
+            const angle = Math.atan2(dy, dx); // Radians
+
+            // Draw an arc to show the angle at M
+            // Only if we aren't perfectly 90 yet, or if we are
+            ctx.beginPath();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+
+            if (isWin) {
+                // Draw square symbol for 90 degrees
+                const size = 20;
+                ctx.beginPath();
+                ctx.moveTo(pillarX, bridgeY - size);
+                ctx.lineTo(pillarX + (pillarX > cx ? -size : size), bridgeY - size);
+                ctx.lineTo(pillarX + (pillarX > cx ? -size : size), bridgeY);
+                ctx.stroke();
+
+                ctx.fillStyle = "white";
+                ctx.fillText("90°", pillarX + 10, bridgeY - 30);
+            } else {
+                // Draw curved arc
+                ctx.arc(pillarX, bridgeY, 30, Math.PI, Math.PI + (Math.PI / 2 - (Math.PI / 2 - Math.atan2(cy - bridgeY, cx - pillarX))), dx > 0);
+                ctx.stroke();
+
+                // Calculate degrees for display
+                // Since chord is horizontal, vertical line is x=pillarX. 
+                // Angle = 90 + deviation
+                let deg = Math.abs(90 - ((pillarX - cx) / radius * 90)); // Approximate visual logic
+                // More precise angle calc
+                let theta = Math.atan2(cy - bridgeY, cx - pillarX) * 180 / Math.PI;
+                // Normalize
+                if (theta < 0) theta += 180;
+                ctx.fillStyle = "#fff";
+                ctx.font = "12px Arial";
+                ctx.fillText(Math.round(theta) + "°", pillarX - 10, bridgeY - 40);
+            }
+
+            // 6. Draw Pillar Base (Draggable Point M)
+            ctx.beginPath();
+            ctx.arc(pillarX, bridgeY, 12, 0, Math.PI * 2);
+            ctx.fillStyle = '#e74c3c'; // Phineas Red
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Label M
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText("M", pillarX - 5, bridgeY + 30);
+
+            // 7. Update Text Stats
+            // Calculate simple pixel distances
+            const lenAM = Math.round(Math.abs(pillarX - chordStartX));
+            const lenMB = Math.round(Math.abs(chordEndX - pillarX));
+
+            amDisplay.innerText = lenAM;
+            mbDisplay.innerText = lenMB;
+
+            // Visual feedback on text
+            if (Math.abs(lenAM - lenMB) < 10) {
+                amDisplay.style.color = "#2ecc71";
+                mbDisplay.style.color = "#2ecc71";
+            } else {
+                amDisplay.style.color = "#333";
+                mbDisplay.style.color = "#333";
+            }
+        }
+
+        // Initialize
+        resize();
+        animate();
+
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Sync-inator 3000</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Carter+One&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --platypus-teal: #008891;
+            --invention-orange: #ff9f1c;
+            --metal-grey: #2d3436;
+            --blueprint-blue: #e3f2fd;
+        }
+
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background-color: var(--blueprint-blue);
+            background-image:
+                linear-gradient(rgba(0, 136, 145, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 136, 145, 0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+        }
+
+        .title-font {
+            font-family: 'Carter One', cursive;
+        }
+
+        /* --- The Machine Layout --- */
+        .machine-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Tanks (Venn Diagram) */
+        .tank-wrapper {
+            position: relative;
+            height: 45%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        .tank {
+            width: 140px;
+            height: 140px;
+            border: 4px solid var(--metal-grey);
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5);
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .tank-label {
+            position: absolute;
+            top: -30px;
+            font-family: 'Carter One', cursive;
+            font-size: 1.5rem;
+            color: var(--metal-grey);
+            background: #fff;
+            padding: 2px 10px;
+            border-radius: 10px;
+            border: 2px solid var(--metal-grey);
+        }
+
+        #tank-left {
+            left: 10%;
+            background-color: rgba(0, 136, 145, 0.1);
+        }
+
+        #tank-right {
+            right: 10%;
+            background-color: rgba(255, 159, 28, 0.1);
+        }
+
+        /* The Intersection (HCF Zone) */
+        #tank-shared {
+            width: 100px;
+            height: 100px;
+            border: 4px dashed var(--metal-grey);
+            /* Dashed until active */
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 10;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .tank.drag-over {
+            background-color: rgba(118, 255, 3, 0.3) !important;
+            transform: scale(1.05);
+            border-color: #76ff03;
+        }
+
+        /* Connecting Pipes */
+        .pipe {
+            position: absolute;
+            height: 20px;
+            background: var(--metal-grey);
+            z-index: 5;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .pipe-left {
+            left: calc(10% + 130px);
+            width: 60px;
+        }
+
+        /* Rough positioning */
+        .pipe-right {
+            right: calc(10% + 130px);
+            width: 60px;
+        }
+
+        /* Draggable Factors */
+        .fuel-bay {
+            height: 15%;
+            background: rgba(0, 0, 0, 0.05);
+            border-top: 2px solid var(--metal-grey);
+            border-bottom: 2px solid var(--metal-grey);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            padding: 10px;
+            position: relative;
+        }
+
+        .factor-orb {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #fff, #bdc3c7);
+            border: 2px solid #2c3e50;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            cursor: grab;
+            box-shadow: 0 4px 5px rgba(0, 0, 0, 0.2);
+            z-index: 50;
+            touch-action: none;
+            /* Crucial for custom touch drag */
+        }
+
+        .factor-orb.placed {
+            width: 35px;
+            height: 35px;
+            font-size: 1rem;
+            position: static;
+            /* Let flexbox in tanks handle it? No, absolute preferred for messy look */
+            cursor: default;
+        }
+
+        /* Animation Zone (LCM) */
+        .sync-zone {
+            flex: 1;
+            background: var(--metal-grey);
+            position: relative;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            overflow: hidden;
+            border-top: 4px solid #000;
+        }
+
+        .gear {
+            width: 80px;
+            height: 80px;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='%237f8c8d'%3E%3Cpath d='M50 0 L60 20 L80 20 L70 40 L85 55 L65 70 L60 90 L40 90 L35 70 L15 55 L30 40 L20 20 L40 20 Z'/%3E%3Ccircle cx='50' cy='50' r='15' fill='%232c3e50'/%3E%3C/svg%3E");
+            background-size: cover;
+            position: relative;
+            transition: transform 0.1s linear;
+        }
+
+        .gear::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 4px;
+            height: 15px;
+            background: red;
+            /* The marker */
+            transform: translateX(-50%);
+        }
+
+        .marker-light {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #333;
+            border: 2px solid #555;
+            margin-bottom: 10px;
+            transition: background 0.1s;
+        }
+
+        .marker-light.on {
+            background: #00ff00;
+            box-shadow: 0 0 15px #00ff00;
+        }
+
+        /* Buttons */
+        .action-btn {
+            background: var(--invention-orange);
+            border: 4px solid #e67e22;
+            color: white;
+            font-family: 'Carter One', cursive;
+            padding: 10px 30px;
+            font-size: 1.5rem;
+            border-radius: 50px;
+            box-shadow: 0 6px 0 #d35400;
+            transition: all 0.1s;
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 60;
+        }
+
+        .action-btn:active {
+            transform: translateX(-50%) translateY(4px);
+            box-shadow: 0 2px 0 #d35400;
+        }
+
+        /* Stats Panel */
+        .stats-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border: 2px solid var(--metal-grey);
+            border-radius: 8px;
+            font-size: 0.8rem;
+            display: none;
+        }
+
+        /* Confetti */
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: red;
+            animation: fall 2s linear forwards;
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body class="h-screen w-screen">
+
+    <div class="machine-container">
+
+        <!-- Header -->
+        <header class="p-4 text-center">
+            <h1 class="text-4xl title-font text-teal-700 drop-shadow-md">SYNC-INATOR 3000</h1>
+            <p class="text-gray-600 text-sm">Organize fuel cells to synchronize the gears!</p>
+        </header>
+
+        <!-- The Tanks (Venn) -->
+        <div class="tank-wrapper">
+            <!-- Left Tank -->
+            <div id="tank-left" class="tank" data-zone="left">
+                <div class="tank-label" id="label-left">?</div>
+            </div>
+
+            <!-- Pipes -->
+            <div class="pipe" style="left: 30%; width: 20%; transform: rotate(10deg); top: 55%;"></div>
+            <div class="pipe" style="right: 30%; width: 20%; transform: rotate(-10deg); top: 55%;"></div>
+
+            <!-- Right Tank -->
+            <div id="tank-right" class="tank" data-zone="right">
+                <div class="tank-label" id="label-right">?</div>
+            </div>
+
+            <!-- Shared Tank (Center) -->
+            <div id="tank-shared" class="tank" style="top: 50%; left: 50%; transform: translate(-50%, -50%);"
+                data-zone="shared">
+                <span class="text-xs text-gray-400 mt-8 pointer-events-none">SHARED<br>(HCF)</span>
+            </div>
+
+            <!-- Result Display (Hidden initially) -->
+            <div id="result-overlay" class="absolute top-0 w-full text-center hidden pointer-events-none z-50">
+                <div class="inline-block bg-black/80 text-white p-4 rounded-xl backdrop-blur">
+                    <div class="text-xl text-yellow-400">HCF: <span id="hcf-display">?</span></div>
+                    <div class="text-xl text-green-400">LCM: <span id="lcm-display">?</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fuel Bay (Spawns Factors) -->
+        <div class="fuel-bay" id="fuel-bay">
+            <div class="absolute left-2 top-2 text-xs text-gray-500 uppercase font-bold">Fuel Cells</div>
+            <!-- Orbs injected here -->
+        </div>
+
+        <!-- Sync Visualization (Bottom) -->
+        <div class="sync-zone">
+
+            <div class="flex flex-col items-center">
+                <div id="light-left" class="marker-light"></div>
+                <div id="gear-left" class="gear border-4 border-teal-600 rounded-full"></div>
+                <div class="mt-2 bg-teal-800 text-white px-2 rounded text-xs">Interval: <span id="int-left">?</span>
+                </div>
+            </div>
+
+            <div class="h-full w-1 bg-white/20"></div>
+
+            <div class="flex flex-col items-center">
+                <div id="light-right" class="marker-light"></div>
+                <div id="gear-right" class="gear border-4 border-orange-500 rounded-full"></div>
+                <div class="mt-2 bg-orange-800 text-white px-2 rounded text-xs">Interval: <span id="int-right">?</span>
+                </div>
+            </div>
+
+            <div id="timeline-marker" class="absolute bottom-2 text-white text-4xl title-font hidden">
+                SYNC!
+            </div>
+
+            <button id="activate-btn" onclick="checkAndActivate()" class="action-btn">
+                ACTIVATE!
+            </button>
+
+            <button id="next-btn" onclick="nextLevel()" class="action-btn hidden bg-green-500 border-green-700">
+                NEXT LEVEL
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Modals -->
+    <div id="intro-modal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-lg max-w-sm w-full text-center border-4 border-teal-600 shadow-2xl">
+            <h2 class="text-2xl title-font text-teal-700 mb-4">How to Operate</h2>
+            <ul class="text-left text-sm space-y-3 mb-6 font-mono">
+                <li>1. Break down the numbers into <strong>Prime Fuel Cells</strong>.</li>
+                <li>2. Drag cells to the tanks:
+                    <ul class="ml-4 list-disc text-gray-600 mt-1">
+                        <li>Only in Left Number? -> <strong>Left Tank</strong></li>
+                        <li>Only in Right Number? -> <strong>Right Tank</strong></li>
+                        <li>In BOTH? -> <strong>Center Core</strong> (This builds the HCF!)</li>
+                    </ul>
+                </li>
+                <li>3. Hit <strong>ACTIVATE</strong> to sync the gears!</li>
+            </ul>
+            <button onclick="startGame()"
+                class="bg-teal-600 text-white font-bold py-2 px-6 rounded-full hover:bg-teal-500">START ENGINE</button>
+        </div>
+    </div>
+
+    <script>
+        // Game Logic
+        const levels = [
+            { a: 4, b: 6 },
+            { a: 8, b: 12 },
+            { a: 6, b: 9 },
+            { a: 10, b: 15 },
+            { a: 12, b: 18 },
+            { a: 20, b: 30 }
+        ];
+
+        let currentLevel = 0;
+        let currentA, currentB;
+        let factorsA = [];
+        let factorsB = [];
+        let initialOrbs = []; // State of where orbs are
+        let placedOrbs = []; // { id, value, zone }
+
+        // DOM
+        const fuelBay = document.getElementById('fuel-bay');
+        const tankLeft = document.getElementById('tank-left');
+        const tankRight = document.getElementById('tank-right');
+        const tankShared = document.getElementById('tank-shared');
+        const labelLeft = document.getElementById('label-left');
+        const labelRight = document.getElementById('label-right');
+        const intLeft = document.getElementById('int-left');
+        const intRight = document.getElementById('int-right');
+        const activateBtn = document.getElementById('activate-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const resultOverlay = document.getElementById('result-overlay');
+        const introModal = document.getElementById('intro-modal');
+
+        // Helpers
+        function getPrimeFactors(n) {
+            const factors = [];
+            let divisor = 2;
+            while (n >= 2) {
+                if (n % divisor === 0) {
+                    factors.push(divisor);
+                    n = n / divisor;
+                } else {
+                    divisor++;
+                }
+            }
+            return factors;
+        }
+
+        function getHCF(a, b) {
+            if (!b) return a;
+            return getHCF(b, a % b);
+        }
+
+        function getLCM(a, b) {
+            return (a * b) / getHCF(a, b);
+        }
+
+        // Init
+        function startGame() {
+            introModal.classList.add('hidden');
+            loadLevel(0);
+        }
+
+        function loadLevel(idx) {
+            currentLevel = idx;
+            const level = levels[idx];
+            currentA = level.a;
+            currentB = level.b;
+
+            factorsA = getPrimeFactors(currentA);
+            factorsB = getPrimeFactors(currentB);
+
+            // Calculate Solution for validation
+            // We need to know exactly how many 2s, 3s etc are in Shared vs Unique
+            // But for the GAMEPLAY, we just give the user a pool of factors combined
+            // and they have to sort them.
+
+            // Wait, standard Venn Diagram logic:
+            // If A has [2, 2, 3] and B has [2, 3, 5]
+            // Shared: [2, 3]
+            // Unique A: [2]
+            // Unique B: [5]
+            // Total Orbs needed: A U B (union of multisets)
+
+            // Let's compute the Multiset Union and Intersection
+            const mapA = countFactors(factorsA);
+            const mapB = countFactors(factorsB);
+            const allPrimes = new Set([...Object.keys(mapA), ...Object.keys(mapB)]);
+
+            initialOrbs = [];
+
+            allPrimes.forEach(p => {
+                const prime = parseInt(p);
+                const countA = mapA[p] || 0;
+                const countB = mapB[p] || 0;
+
+                const shared = Math.min(countA, countB);
+                const uniqueA = countA - shared;
+                const uniqueB = countB - shared;
+
+                // Create Orb Objects
+                for (let i = 0; i < uniqueA; i++) initialOrbs.push({ val: prime, target: 'left' });
+                for (let i = 0; i < uniqueB; i++) initialOrbs.push({ val: prime, target: 'right' });
+                for (let i = 0; i < shared; i++) initialOrbs.push({ val: prime, target: 'shared' });
+            });
+
+            // Reset UI
+            labelLeft.innerText = currentA;
+            labelRight.innerText = currentB;
+            intLeft.innerText = currentA + "s";
+            intRight.innerText = currentB + "s";
+            fuelBay.innerHTML = '';
+
+            // Clean Tanks
+            document.querySelectorAll('.factor-orb.placed').forEach(el => el.remove());
+
+            // Spawn Draggable Orbs
+            initialOrbs.sort(() => Math.random() - 0.5).forEach((orb, i) => {
+                const el = document.createElement('div');
+                el.classList.add('factor-orb');
+                el.innerText = orb.val;
+                el.id = `orb-${i}`;
+                el.setAttribute('data-target', orb.target); // Hidden cheat/logic
+                el.setAttribute('data-val', orb.val);
+
+                // Randomize spawn position slightly in bay
+                setupDrag(el);
+                fuelBay.appendChild(el);
+            });
+
+            placedOrbs = [];
+            activateBtn.classList.remove('hidden');
+            nextBtn.classList.add('hidden');
+            resultOverlay.classList.add('hidden');
+            resetGears();
+        }
+
+        function countFactors(arr) {
+            const map = {};
+            arr.forEach(x => map[x] = (map[x] || 0) + 1);
+            return map;
+        }
+
+        // --- Drag and Drop Logic (Touch + Mouse) ---
+        let currentDrag = null;
+        let startX, startY;
+
+        function setupDrag(el) {
+            const start = (e) => {
+                e.preventDefault(); // Prevent scrolling
+                currentDrag = el;
+                const touch = e.touches ? e.touches[0] : e;
+                const rect = el.getBoundingClientRect();
+
+                // Offset to grab center/relative
+                el.dataset.offX = touch.clientX - rect.left;
+                el.dataset.offY = touch.clientY - rect.top;
+
+                el.style.position = 'fixed';
+                el.style.zIndex = 100;
+                el.style.width = '45px'; // Maintain size
+                move(e);
+            };
+
+            el.addEventListener('mousedown', start);
+            el.addEventListener('touchstart', start, { passive: false });
+        }
+
+        const move = (e) => {
+            if (!currentDrag) return;
+            const touch = e.touches ? e.touches[0] : e;
+
+            currentDrag.style.left = (touch.clientX - currentDrag.dataset.offX) + 'px';
+            currentDrag.style.top = (touch.clientY - currentDrag.dataset.offY) + 'px';
+
+            // Highlight zones
+            highlightZones(touch.clientX, touch.clientY);
+        };
+
+        const end = (e) => {
+            if (!currentDrag) return;
+
+            // Check Drop
+            const touch = e.changedTouches ? e.changedTouches[0] : e;
+            const dropZone = getDropZone(touch.clientX, touch.clientY);
+
+            if (dropZone) {
+                dockOrb(currentDrag, dropZone);
+            } else {
+                // Return to bay
+                resetOrbToBay(currentDrag);
+            }
+
+            // Cleanup
+            [tankLeft, tankRight, tankShared].forEach(t => t.classList.remove('drag-over'));
+            currentDrag = null;
+        };
+
+        document.addEventListener('mousemove', move);
+        document.addEventListener('touchmove', move, { passive: false });
+        document.addEventListener('mouseup', end);
+        document.addEventListener('touchend', end);
+
+        function highlightZones(x, y) {
+            [tankLeft, tankRight, tankShared].forEach(t => t.classList.remove('drag-over'));
+            const zone = getDropZone(x, y);
+            if (zone) document.getElementById(`tank-${zone}`).classList.add('drag-over');
+        }
+
+        function getDropZone(x, y) {
+            // Check Shared First (since it overlaps)
+            const sharedRect = tankShared.getBoundingClientRect();
+            if (x >= sharedRect.left && x <= sharedRect.right && y >= sharedRect.top && y <= sharedRect.bottom) return 'shared';
+
+            const leftRect = tankLeft.getBoundingClientRect();
+            if (x >= leftRect.left && x <= leftRect.right && y >= leftRect.top && y <= leftRect.bottom) return 'left';
+
+            const rightRect = tankRight.getBoundingClientRect();
+            if (x >= rightRect.left && x <= rightRect.right && y >= rightRect.top && y <= rightRect.bottom) return 'right';
+
+            return null;
+        }
+
+        function dockOrb(el, zone) {
+            // Logic: Append to zone container visually?
+            // Actually, visually putting them inside absolute divs is tricky with stacking contexts.
+            // Let's just calculate a random position inside the rect and fix it there.
+
+            const container = document.getElementById(`tank-${zone}`);
+            const rect = container.getBoundingClientRect();
+
+            // Random pos inside circle
+            // Simple approach: Center + jitter
+            const jitterX = (Math.random() - 0.5) * 40;
+            const jitterY = (Math.random() - 0.5) * 40;
+
+            el.style.position = 'absolute';
+            el.style.left = (rect.left + rect.width / 2 + jitterX - 22) + 'px'; // 22 is half width
+            el.style.top = (rect.top + rect.height / 2 + jitterY - 22) + 'px';
+            el.classList.add('placed');
+
+            // Update Logic
+            // Remove previous entry if exists
+            placedOrbs = placedOrbs.filter(o => o.id !== el.id);
+            placedOrbs.push({
+                id: el.id,
+                val: parseInt(el.getAttribute('data-val')),
+                zone: zone,
+                target: el.getAttribute('data-target') // Cheat sheet
+            });
+        }
+
+        function resetOrbToBay(el) {
+            el.style.position = 'static';
+            el.classList.remove('placed');
+            fuelBay.appendChild(el);
+            placedOrbs = placedOrbs.filter(o => o.id !== el.id);
+        }
+
+        // --- Validation & Animation ---
+
+        function checkAndActivate() {
+            // 1. Check if all orbs are placed
+            if (placedOrbs.length < initialOrbs.length) {
+                alert("Place all fuel cells first!");
+                return;
+            }
+
+            // 2. Check correctness
+            let allCorrect = true;
+            placedOrbs.forEach(orb => {
+                if (orb.zone !== orb.target) allCorrect = false;
+            });
+
+            if (!allCorrect) {
+                alert("Malfunction! Some fuel cells are in the wrong tank. Check the factors!");
+                // Shake effect
+                document.querySelector('.tank-wrapper').classList.add('shake');
+                setTimeout(() => document.querySelector('.tank-wrapper').classList.remove('shake'), 500);
+                return;
+            }
+
+            // 3. Success Sequence
+            activateBtn.classList.add('hidden');
+            animateSync();
+        }
+
+        function animateSync() {
+            // Visual Calculation
+            const hcf = getHCF(currentA, currentB);
+            const lcm = getLCM(currentA, currentB);
+
+            document.getElementById('hcf-display').innerText = hcf;
+            document.getElementById('lcm-display').innerText = lcm;
+            resultOverlay.classList.remove('hidden');
+
+            // Gear Animation
+            // We want gear A to rotate 360deg every A seconds (scaled)
+            // We want gear B to rotate 360deg every B seconds (scaled)
+            // They should meet at top at LCM.
+
+            const gearL = document.getElementById('gear-left');
+            const gearR = document.getElementById('gear-right');
+            const lightL = document.getElementById('light-left');
+            const lightR = document.getElementById('light-right');
+
+            let time = 0;
+            const speedScale = 10; // Simulation speed
+
+            // Reset transforms
+            gearL.style.transform = `rotate(0deg)`;
+            gearR.style.transform = `rotate(0deg)`;
+
+            const interval = setInterval(() => {
+                time += 0.5; // Tick
+
+                // Rotate
+                // Deg = (Time / Value) * 360
+                const degL = (time / currentA) * 360;
+                const degR = (time / currentB) * 360;
+
+                gearL.style.transform = `rotate(${degL}deg)`;
+                gearR.style.transform = `rotate(${degR}deg)`;
+
+                // Flash Lights at multiples
+                if (Math.abs(time % currentA) < 0.5) flash(lightL);
+                if (Math.abs(time % currentB) < 0.5) flash(lightR);
+
+                // Check Sync (LCM)
+                if (Math.abs(time - lcm) < 0.5) {
+                    clearInterval(interval);
+                    flash(lightL);
+                    flash(lightR);
+                    gearL.style.transform = `rotate(${(lcm / currentA) * 360}deg)`; // Snap
+                    gearR.style.transform = `rotate(${(lcm / currentB) * 360}deg)`;
+
+                    document.getElementById('timeline-marker').classList.remove('hidden');
+                    document.getElementById('timeline-marker').innerText = `SYNC AT ${lcm}!`;
+
+                    confettiExplosion();
+                    nextBtn.classList.remove('hidden');
+                }
+
+            }, 50);
+        }
+
+        function flash(el) {
+            el.classList.add('on');
+            setTimeout(() => el.classList.remove('on'), 200);
+        }
+
+        function confettiExplosion() {
+            for (let i = 0; i < 30; i++) {
+                const c = document.createElement('div');
+                c.className = 'confetti';
+                c.style.left = Math.random() * 100 + 'vw';
+                c.style.backgroundColor = ['#f00', '#0f0', '#00f', '#ff0'][Math.floor(Math.random() * 4)];
+                c.style.animationDuration = (Math.random() * 2 + 1) + 's';
+                document.body.appendChild(c);
+            }
+        }
+
+        function resetGears() {
+            document.getElementById('gear-left').style.transform = `rotate(0deg)`;
+            document.getElementById('gear-right').style.transform = `rotate(0deg)`;
+            document.getElementById('timeline-marker').classList.add('hidden');
+        }
+
+        function nextLevel() {
+            if (currentLevel + 1 < levels.length) {
+                loadLevel(currentLevel + 1);
+            } else {
+                alert("All Systems Operational! You are a master engineer.");
+                loadLevel(0);
+            }
+        }
+
+        // CSS Shake
+        const style = document.createElement('style');
+        style.innerHTML = `
+            .shake { animation: shake 0.5s; }
+            @keyframes shake {
+                0% { transform: translateX(0); }
+                25% { transform: translateX(-5px); }
+                50% { transform: translateX(5px); }
+                75% { transform: translateX(-5px); }
+                100% { transform: translateX(0); }
+            }
+        `;
+        document.head.appendChild(style);
+
+    </script>
+</body>
+
+</html>

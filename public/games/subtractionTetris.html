@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subtraction Tetris</title>
+
+    <!-- React and ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        @keyframes splatter {
+            0% {
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translate(var(--tx), var(--ty)) scale(0);
+                opacity: 0;
+            }
+        }
+
+        .animate-splatter {
+            animation: splatter 0.6s ease-out forwards;
+        }
+
+        @keyframes drop-in {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .animate-drop-in {
+            animation: drop-in 0.1s ease-out;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // --- Mock Lucide Icons ---
+        const Play = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>;
+        const RotateCcw = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>;
+        const Hammer = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 12-8.5 8.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L12 9"></path><path d="M17.64 15 22 10.64"></path><path d="m20.91 11.7-1.25-1.25c-.6-.6-.93-1.4-.93-2.25V2.46V2a2 2 0 0 0-2-2H11.9a2 2 0 0 0-2 2v5.76c0 .85-.33 1.65-.93 2.25L7.74 11.2"></path></svg>;
+        const ArrowLeft = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>;
+        const ArrowRight = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>;
+        const ArrowDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>;
+        const ShieldAlert = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"></path><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>;
+        const Keyboard = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><line x1="6" y1="8" x2="6" y2="8"></line><line x1="10" y1="8" x2="10" y2="8"></line><line x1="14" y1="8" x2="14" y2="8"></line><line x1="18" y1="8" x2="18" y2="8"></line><line x1="6" y1="12" x2="6" y2="12"></line><line x1="10" y1="12" x2="10" y2="12"></line><line x1="14" y1="12" x2="14" y2="12"></line><line x1="18" y1="12" x2="18" y2="12"></line><line x1="6" y1="16" x2="6" y2="16"></line><line x1="10" y1="16" x2="14" y2="16"></line><line x1="18" y1="16" x2="18" y2="16"></line></svg>;
+        const Zap = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>;
+
+        // --- Components ---
+
+        // Particle effect for successful repairs
+        const CementSplatter = ({ x, y, color }) => (
+            <div className="absolute pointer-events-none z-20" style={{ left: x, top: y, width: '60px', height: '60px' }}>
+                {[...Array(6)].map((_, i) => (
+                    <div key={i} className="absolute w-3 h-3 rounded-full animate-splatter" style={{
+                        backgroundColor: color || '#cbd5e1'
+                        , left: '50%', top: '50%', '--tx': `${(Math.random() - 0.5) * 100}px`, '--ty': `${(Math.random() - 0.5) *
+                            100}px`, animationDelay: `${i * 0.05}s`
+                    }} />
+                ))}
+            </div>
+        );
+
+        function SubtractionTetris() {
+            // Game Constants
+            const COLS = 7;
+            const ROWS = 12;
+            const BASE_SPEED = 1200; // Slower start for easier difficulty
+            const HOLE_COLORS = [
+                { text: 'text-pink-400', bg: 'bg-pink-500', border: 'border-pink-500', glow: 'shadow-pink-500' },
+                { text: 'text-cyan-400', bg: 'bg-cyan-500', border: 'border-cyan-500', glow: 'shadow-cyan-500' },
+                { text: 'text-yellow-400', bg: 'bg-yellow-500', border: 'border-yellow-500', glow: 'shadow-yellow-500' },
+            ];
+
+            // State
+            const [gameState, setGameState] = useState('start'); // start, playing, paused, gameover
+            const [score, setScore] = useState(0);
+            const [lives, setLives] = useState(3);
+            const [level, setLevel] = useState(1);
+            const [holes, setHoles] = useState([]); // Array of { col, value, colorTheme }
+            const [activeBlock, setActiveBlock] = useState(null); // { x, y, equation, result, id }
+            const [splatters, setSplatters] = useState([]);
+
+            // Refs for loop
+            const gameLoopRef = useRef();
+            const lastTickRef = useRef(0);
+            const speedRef = useRef(BASE_SPEED);
+
+            // --- Game Logic Generators ---
+
+            // Generate unique holes for the bottom wall
+            const generateHoles = (difficulty) => {
+                // Determine 3 random columns for holes
+                const holeCols = [];
+                while (holeCols.length < 3) { const c = Math.floor(Math.random() * COLS); if (!holeCols.includes(c)) holeCols.push(c); }
+                // Assign values and colors return holeCols.map((col, index)=> {
+                return holeCols.map((col, index) => {
+                    let val;
+                    if (difficulty === 1) val = Math.floor(Math.random() * 9) + 1; // 1-9
+                    else if (difficulty === 2) val = Math.floor(Math.random() * 15) + 5; // 5-20
+                    else val = Math.floor(Math.random() * 40) + 10; // 10-50
+
+                    return {
+                        col,
+                        value: val,
+                        theme: HOLE_COLORS[index % HOLE_COLORS.length]
+                    };
+                });
+            };
+
+            // Generate an equation that matches one of the holes
+            const spawnBlock = (currentHoles, difficulty) => {
+                if (!currentHoles || currentHoles.length === 0) return null;
+
+                // Pick a target hole
+                const targetHole = currentHoles[Math.floor(Math.random() * currentHoles.length)];
+                const targetVal = targetHole.value;
+
+                // Create equation: a - b = targetVal
+                let b, a;
+
+                if (difficulty === 1) {
+                    b = Math.floor(Math.random() * 5) + 1;
+                } else {
+                    b = Math.floor(Math.random() * 10) + 5;
+                }
+                a = targetVal + b;
+
+                return {
+                    x: Math.floor(COLS / 2),
+                    y: 0,
+                    equation: `${a} - ${b}`,
+                    result: targetVal,
+                    id: Date.now(),
+                    targetTheme: targetHole.theme // Store theme for hints
+                };
+            };
+
+            // --- Game Control ---
+
+            const startGame = () => {
+                const startHoles = generateHoles(1);
+                setHoles(startHoles);
+                // setGrid(Array(ROWS).fill(null).map(() => Array(COLS).fill(null))); // (Grid logic simplified for this version)
+                setActiveBlock(spawnBlock(startHoles, 1));
+                setScore(0);
+                setLives(3);
+                setLevel(1);
+                setGameState('playing');
+                setSplatters([]);
+                speedRef.current = BASE_SPEED;
+                lastTickRef.current = performance.now();
+
+                if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+                gameLoopRef.current = requestAnimationFrame(gameLoop);
+            };
+
+            const gameOver = () => {
+                setGameState('gameover');
+            };
+
+            // --- Loop & Movement ---
+
+            const gameLoop = (timestamp) => {
+                if (gameState !== 'playing') return;
+
+                const deltaTime = timestamp - lastTickRef.current;
+
+                if (deltaTime > speedRef.current) {
+                    tick();
+                    lastTickRef.current = timestamp;
+                }
+
+                if (gameState === 'playing') {
+                    gameLoopRef.current = requestAnimationFrame(gameLoop);
+                }
+            };
+
+            useEffect(() => {
+                if (gameState === 'playing') {
+                    lastTickRef.current = performance.now();
+                    gameLoopRef.current = requestAnimationFrame(gameLoop);
+                }
+                return () => {
+                    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+                };
+            }, [gameState]);
+
+            const tick = () => {
+                setActiveBlock(prev => {
+                    if (!prev) return null;
+
+                    const nextY = prev.y + 1;
+
+                    // HIT DETECTION
+                    if (nextY === ROWS - 1) {
+                        // Need to pass the CURRENT block state to collision handler, not the potentially stale closure one
+                        // So we call a helper that uses the current ref-like value or just handle it in next render?
+                        // Better: Synchronous check here.
+                        handleWallCollision(prev);
+                        return null; // Block destroyed/placed
+                    }
+
+                    return { ...prev, y: nextY };
+                });
+            };
+
+            // We need to access 'holes' in collision. Since tick is called from loop,
+            // we might have stale 'holes' if not careful.
+            // However, in this functional updates pattern, we need 'holes' to be fresh.
+            // We'll rely on the fact that collision only happens occasionally.
+            // A cleaner way for React game loops is using a ref for state, but for this complexity:
+            // We will pass 'holes' to the handler.
+            const handleWallCollision = (block) => {
+                // Note: This function runs during the state update cycle of 'activeBlock'.
+                // To access the latest 'holes', we ideally should have it in a ref or use the state directly if dependencies allow.
+                // Given the structure, we will trust the state is reasonably fresh or use a ref for holes if bugs appear.
+
+                // Check collision against the holes state
+                const hole = holes.find(h => h.col === block.x);
+
+                if (hole) {
+                    if (block.result === hole.value) {
+                        handleSuccess(block, hole);
+                    } else {
+                        handleFail();
+                    }
+                } else {
+                    handleFail();
+                }
+            };
+
+            const handleSuccess = (block, hole) => {
+                const newScore = score + 100;
+                setScore(newScore);
+                addSplatter(block.x, hole.theme.text.replace('text-', '#') /* hacky hex gen or just pass class */);
+
+                // Difficulty Scaling
+                if (newScore % 300 === 0) {
+                    const newLevel = level + 1;
+                    setLevel(newLevel);
+                    speedRef.current = Math.max(300, speedRef.current - 100); // Speed up
+                    const newHoles = generateHoles(Math.min(3, Math.ceil(newLevel / 2)));
+                    setHoles(newHoles);
+                    setActiveBlock(spawnBlock(newHoles, Math.min(3, Math.ceil(newLevel / 2))));
+                } else {
+                    setActiveBlock(spawnBlock(holes, Math.min(3, Math.ceil(level / 2))));
+                }
+            };
+
+            const handleFail = () => {
+                setLives(l => {
+                    const newLives = l - 1;
+                    if (newLives <= 0) { // Defer game over to avoid state clash during render setTimeout(()=> setGameState('gameover'),
+                        setTimeout(() => setGameState('gameover'), 0);
+                    }
+                    return newLives;
+                });
+                // Spawn new immediately
+                setActiveBlock(spawnBlock(holes, Math.min(3, Math.ceil(level / 2))));
+            };
+
+            const addSplatter = (col) => {
+                const id = Date.now();
+                const x = `${(col * 100 / COLS) + (50 / COLS)}%`;
+                setSplatters(prev => [...prev, { id, x, y: '88%' }]);
+                setTimeout(() => {
+                    setSplatters(prev => prev.filter(s => s.id !== id));
+                }, 1000);
+            };
+
+            // --- Inputs ---
+            const move = useCallback((dir) => {
+                setActiveBlock(prev => {
+                    if (!prev) return null;
+                    const nextX = prev.x + dir;
+                    if (nextX >= 0 && nextX < COLS) { return { ...prev, x: nextX }; } return prev;
+                });
+            }, []);
+
+            const drop = useCallback(() => {
+                tick(); // Manual tick
+            }, [holes]);
+
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (gameState !== 'playing') return;
+                    if (e.key === 'ArrowLeft') move(-1);
+                    if (e.key === 'ArrowRight') move(1);
+                    if (e.key === 'ArrowDown') drop();
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [gameState, move, drop]);
+
+            // --- Render Helpers ---
+
+            const renderCell = (r, c) => {
+                // 1. Render Wall (Bottom Row)
+                if (r === ROWS - 1) {
+                    const hole = holes.find(h => h.col === c);
+                    if (hole) {
+                        return (
+                            <div key={`${r}-${c}`} className={`w-full h-full bg-slate-900 flex items-center justify-center border-b-4
+                ${hole.theme.border} relative shadow-inner`}>
+                                <div className={`absolute -top-8 text-[10px] font-bold ${hole.theme.text} bg-slate-800 px-2 py-1
+                    rounded-full border border-slate-700`}>
+                                    Target
+                                </div>
+                                <span className={`text-2xl font-black ${hole.theme.text} font-mono`}>{hole.value}</span>
+
+                                {/* Glow effect */}
+                                <div className={`absolute inset-0 opacity-20 ${hole.theme.bg} blur-md`}></div>
+                            </div>
+                        );
+                    }
+                    return (
+                        <div key={`${r}-${c}`} className="w-full h-full bg-slate-800 border-2 border-slate-700 relative opacity-50">
+                            <div className="absolute top-1/2 w-full h-px bg-slate-900"></div>
+                            <div className="absolute left-1/2 h-full w-px bg-slate-900"></div>
+                        </div>
+                    );
+                }
+
+                // 2. Render Active Block
+                if (activeBlock && activeBlock.y === r && activeBlock.x === c) {
+                    // Visual Hint Logic: If level is low, show matching border color
+                    const showHint = level <= 2;
+                    const borderColor = showHint && activeBlock.targetTheme ? activeBlock.targetTheme.border : 'border-blue-700';
+                    const bgColor = 'bg-blue-600';
+                    return (
+                        <div key={`${r}-${c}`} className="w-full h-full relative animate-drop-in z-10 px-0.5">
+                            <div className={` w-full h-full ${bgColor} rounded-lg shadow-lg border-2 ${borderColor} flex
+                    items-center justify-center ${showHint ? 'animate-pulse' : ''} `}>
+                                <span className="text-white font-bold text-sm lg:text-base whitespace-nowrap drop-shadow-md">
+                                    {activeBlock.equation}
+                                </span>
+                            </div>
+                            {/* Hint Indicator icon above block */}
+                            {showHint && (
+                                <div className={`absolute -top-2 -right-2 w-3 h-3 rounded-full ${activeBlock.targetTheme.bg}
+                    animate-ping`}></div>
+                            )}
+                        </div>
+                    );
+                }
+
+                // 3. Grid Lines (Subtle)
+                return <div key={`${r}-${c}`} className="w-full h-full border border-white/5"></div>;
+            };
+
+            return (
+                <div
+                    className="min-h-screen bg-slate-950 font-sans text-slate-100 flex flex-col md:flex-row items-center justify-center p-4 gap-8 select-none">
+
+                    {/* Game Container */}
+                    <div className="flex flex-col items-center w-full max-w-md">
+
+                        {/* Header HUD */}
+                        <div
+                            className="w-full flex justify-between items-center mb-4 bg-slate-900/80 p-4 rounded-2xl border border-slate-800 shadow-xl backdrop-blur">
+                            <div className="flex items-center gap-3">
+                                <div
+                                    className="bg-gradient-to-br from-orange-500 to-red-600 p-2.5 rounded-xl shadow-lg shadow-orange-900/20">
+                                    <Hammer className="w-6 h-6 text-white" />
+                                </div>
+                                <div>
+                                    <h1 className="font-bold text-slate-200 leading-none text-lg">Subtraction</h1>
+                                    <div className="text-xs font-bold text-orange-400 leading-none tracking-wider mt-1">
+                                        THE WALL</div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-6 text-right">
+                                <div>
+                                    <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">
+                                        Level</div>
+                                    <div className="font-mono text-xl font-bold text-cyan-400">{level}</div>
+                                </div>
+                                <div>
+                                    <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">
+                                        Score</div>
+                                    <div className="font-mono text-xl font-bold text-yellow-400">{score}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Game Board Surface */}
+                        <div
+                            className="relative bg-slate-900/50 rounded-xl shadow-2xl overflow-hidden border-4 border-slate-800 w-full aspect-[7/12] max-h-[70vh]">
+
+                            {/* Particles */}
+                            {splatters.map(s =>
+                                <CementSplatter key={s.id} x={s.x} y={s.y} />)}
+
+                            {/* Start Screen */}
+                            {gameState === 'start' && (
+                                <div
+                                    className="absolute inset-0 bg-slate-950/90 z-30 flex flex-col items-center justify-center p-8 text-center backdrop-blur-sm">
+                                    <div className="bg-slate-900 p-4 rounded-full mb-6 border border-slate-800">
+                                        <Hammer className="w-12 h-12 text-orange-500 animate-pulse" />
+                                    </div>
+                                    <h2 className="text-3xl font-bold text-white mb-3">Repair the Wall</h2>
+                                    <p className="text-slate-400 mb-8 text-sm leading-relaxed max-w-xs">
+                                        Match the <span className="text-blue-400 font-bold">Equation Block</span> to the
+                                        correct <span className="text-pink-400 font-bold">Answer Hole</span> at the bottom.
+                                    </p>
+
+                                    {/* Visual Guide for Start Screen */}
+                                    <div
+                                        className="flex items-center gap-4 mb-8 text-sm bg-slate-900 p-3 rounded-lg border border-slate-800">
+                                        <div
+                                            className="bg-blue-600 px-3 py-1 rounded text-white font-bold border-2 border-pink-500">
+                                            10 - 5</div>
+                                        <ArrowDown className="text-slate-600" />
+                                        <div className="text-pink-400 font-bold text-xl">5</div>
+                                    </div>
+
+                                    <button onClick={startGame}
+                                        className="w-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white py-4 rounded-xl font-bold transition-all transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-orange-900/50">
+                                        <Play className="w-5 h-5 fill-current" />
+                                        Start Game
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Game Over Screen */}
+                            {gameState === 'gameover' && (
+                                <div
+                                    className="absolute inset-0 bg-red-950/90 z-30 flex flex-col items-center justify-center p-8 text-center backdrop-blur-sm animate-in fade-in">
+                                    <ShieldAlert
+                                        className="w-20 h-20 text-red-500 mb-6 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]" />
+                                    <h2 className="text-4xl font-black text-white mb-2">CRASH!</h2>
+                                    <div className="text-slate-300 mb-2">Final Score</div>
+                                    <div className="text-6xl font-black text-yellow-400 mb-8 drop-shadow-md">{score}</div>
+                                    <button onClick={startGame}
+                                        className="bg-white text-red-900 px-10 py-4 rounded-full font-bold transition-all hover:bg-gray-100 flex items-center gap-2 shadow-xl hover:shadow-2xl hover:-translate-y-1">
+                                        <RotateCcw className="w-5 h-5" />
+                                        Try Again
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Main Grid */}
+                            <div className="w-full h-full grid" style={{
+                                gridTemplateColumns: `repeat(${COLS}, 1fr)`,
+                                gridTemplateRows: `repeat(${ROWS}, 1fr)`
+                            }}>
+                                {Array.from({ length: ROWS }).map((_, r) => (
+                                    Array.from({ length: COLS }).map((_, c) => renderCell(r, c))
+                                ))}
+                            </div>
+
+                            {/* Lives Overlay */}
+                            <div
+                                className="absolute top-3 left-3 flex gap-1.5 z-20 bg-slate-900/50 p-1.5 rounded-full backdrop-blur-sm border border-white/10">
+                                {[...Array(3)].map((_, i) => (
+                                    <div key={i} className={`w-3 h-3 rounded-full transition-all duration-300 ${i < lives
+                                        ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] scale-100'
+                                        : 'bg-slate-700 scale-75'}`} />
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Mobile Controls (Visible only on touch/small screens usually, but kept for clickability) */}
+                        <div className="md:hidden w-full mt-4 grid grid-cols-3 gap-4 h-20">
+                            <button
+                                className="bg-slate-800 rounded-2xl flex items-center justify-center active:bg-slate-700 transition-colors shadow-lg"
+                                onPointerDown={(e) => { e.preventDefault(); move(-1); }}
+                            >
+                                <ArrowLeft className="w-8 h-8 text-slate-400" />
+                            </button>
+                            <button
+                                className="bg-slate-800 rounded-2xl flex items-center justify-center active:bg-slate-700 transition-colors shadow-lg"
+                                onPointerDown={(e) => { e.preventDefault(); drop(); }}
+                            >
+                                <ArrowDown className="w-8 h-8 text-slate-400" />
+                            </button>
+                            <button
+                                className="bg-slate-800 rounded-2xl flex items-center justify-center active:bg-slate-700 transition-colors shadow-lg"
+                                onPointerDown={(e) => { e.preventDefault(); move(1); }}
+                            >
+                                <ArrowRight className="w-8 h-8 text-slate-400" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Desktop Sidebar / Instructions */}
+                    <div className="hidden md:flex flex-col gap-6 w-64">
+                        <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
+                            <h3
+                                className="text-slate-400 font-bold uppercase tracking-widest text-xs mb-4 flex items-center gap-2">
+                                <Keyboard className="w-4 h-4" /> Controls
+                            </h3>
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-3 text-sm text-slate-300">
+                                    <div
+                                        className="w-8 h-8 bg-slate-800 rounded flex items-center justify-center border-b-2 border-slate-700 font-mono">
+                                        ←</div>
+                                    <span>Move Left</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-sm text-slate-300">
+                                    <div
+                                        className="w-8 h-8 bg-slate-800 rounded flex items-center justify-center border-b-2 border-slate-700 font-mono">
+                                        →</div>
+                                    <span>Move Right</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-sm text-slate-300">
+                                    <div
+                                        className="w-8 h-8 bg-slate-800 rounded flex items-center justify-center border-b-2 border-slate-700 font-mono">
+                                        ↓</div>
+                                    <span>Speed Up</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
+                            <h3
+                                className="text-slate-400 font-bold uppercase tracking-widest text-xs mb-4 flex items-center gap-2">
+                                <Zap className="w-4 h-4" /> Hint System
+                            </h3>
+                            <p className="text-slate-400 text-sm leading-relaxed">
+                                In <span className="text-cyan-400 font-bold">Level 1 & 2</span>, the falling block glows
+                                with the color of the correct answer hole.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<SubtractionTetris />);
+
+    </script>
+</body>
+
+</html>

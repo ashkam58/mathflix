@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Missing Corner Mystery</title>
+
+    <!-- React and ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Roboto+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background-color: #1e1b4b;
+            /* Deep Indigo */
+            color: #e2e8f0;
+            background-image: radial-gradient(#312e81 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .font-typewriter {
+            font-family: 'Special Elite', cursive;
+        }
+
+        .folder-tab {
+            clip-path: polygon(0 0, 15% 0, 20% 100%, 0% 100%);
+        }
+
+        .evidence-marker {
+            filter: drop-shadow(2px 2px 2px rgba(0, 0, 0, 0.5));
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-3px);
+            }
+
+            100% {
+                transform: translateY(0px);
+            }
+        }
+
+        .magnify-cursor {
+            cursor: crosshair;
+        }
+
+        .flash-success {
+            animation: flashSuccess 0.5s ease-out;
+        }
+
+        @keyframes flashSuccess {
+            0% {
+                background-color: rgba(34, 197, 94, 0.5);
+            }
+
+            100% {
+                background-color: transparent;
+            }
+        }
+
+        .grid-line {
+            transition: stroke 0.3s;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+
+        const { useState, useEffect, useCallback } = React;
+
+        // --- Icons ---
+        const MagnifyingGlass = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        );
+        const Folder = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+        );
+        const Check = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-green-500"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        );
+        const XMark = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-red-500"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        );
+
+        // --- Constants ---
+        const GRID_SIZE = 10;
+
+        // --- Logic ---
+        const generateProblem = () => {
+            // 1. Generate random bottom-left corner (x1, y1)
+            // Ensure room for width/height
+            const minSize = 3;
+            const x1 = Math.floor(Math.random() * (GRID_SIZE - minSize));
+            const y1 = Math.floor(Math.random() * (GRID_SIZE - minSize));
+
+            // 2. Generate width and height
+            const maxWidth = GRID_SIZE - x1;
+            const maxHeight = GRID_SIZE - y1;
+
+            // 50% chance of Square vs Rectangle
+            let width, height;
+            if (Math.random() > 0.5) {
+                // Square
+                const side = Math.floor(Math.random() * (Math.min(maxWidth, maxHeight) - minSize)) + minSize;
+                width = side;
+                height = side;
+            } else {
+                // Rectangle
+                width = Math.floor(Math.random() * (maxWidth - minSize)) + minSize;
+                height = Math.floor(Math.random() * (maxHeight - minSize)) + minSize;
+            }
+
+            const x2 = x1 + width;
+            const y2 = y1 + height;
+
+            // Define 4 points
+            const points = [
+                { x: x1, y: y1, id: 'A' }, // Bottom-Left
+                { x: x2, y: y1, id: 'B' }, // Bottom-Right
+                { x: x2, y: y2, id: 'C' }, // Top-Right
+                { x: x1, y: y2, id: 'D' }  // Top-Left
+            ];
+
+            // Pick one to hide
+            const hiddenIndex = Math.floor(Math.random() * 4);
+            const hiddenPoint = points[hiddenIndex];
+            const visiblePoints = points.filter((_, i) => i !== hiddenIndex);
+
+            // Determine shape name
+            const shapeName = (width === height) ? "Square" : "Rectangle";
+
+            return {
+                visiblePoints,
+                hiddenPoint,
+                shapeName,
+                dimensions: { width, height },
+                allPoints: points // stored for drawing the final shape solution
+            };
+        };
+
+        // --- Components ---
+
+        const Grid = ({ problem, userGuess, onCellClick, isSolved, showWrong }) => {
+            const padding = 1;
+            const viewBoxSize = GRID_SIZE + 2 * padding;
+
+            // Helper to flip Y axis for SVG (0,0 at bottom-left)
+            const toSvg = (x, y) => ({
+                x: x + padding,
+                y: (GRID_SIZE - y) + padding
+            });
+
+            // Create Lines
+            const gridLines = [];
+            const labels = [];
+
+            for (let i = 0; i <= GRID_SIZE; i++) {
+                // Vertical
+                let start = toSvg(i, 0);
+                let end = toSvg(i, GRID_SIZE);
+                gridLines.push(<line key={`v${i}`} x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke="#4f46e5" strokeWidth="0.05" strokeOpacity="0.3" />);
+                labels.push(<text key={`xl${i}`} x={start.x} y={start.y + 0.5} fontSize="0.35" textAnchor="middle" fill="#818cf8">{i}</text>);
+
+                // Horizontal
+                start = toSvg(0, i);
+                end = toSvg(GRID_SIZE, i);
+                gridLines.push(<line key={`h${i}`} x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke="#4f46e5" strokeWidth="0.05" strokeOpacity="0.3" />);
+                labels.push(<text key={`yl${i}`} x={start.x - 0.3} y={start.y + 0.1} fontSize="0.35" textAnchor="end" fill="#818cf8">{i}</text>);
+            }
+
+            // Interaction Targets
+            const interactables = [];
+            for (let x = 0; x <= GRID_SIZE; x++) {
+                for (let y = 0; y <= GRID_SIZE; y++) {
+                    const pos = toSvg(x, y);
+                    interactables.push(
+                        <circle
+                            key={`int-${x}-${y}`}
+                            cx={pos.x}
+                            cy={pos.y}
+                            r="0.25"
+                            fill="transparent"
+                            className="cursor-pointer hover:fill-yellow-400/30"
+                            onClick={() => onCellClick(x, y)}
+                        />
+                    );
+                }
+            }
+
+            // Draw Shape Solution (Polygon)
+            let solutionPoly = null;
+            if (isSolved) {
+                // Sort points to draw polygon correctly: A -> B -> C -> D
+                // Our problem.allPoints is already ordered nicely (BL, BR, TR, TL)
+                const polyPoints = problem.allPoints.map(p => {
+                    const svgP = toSvg(p.x, p.y);
+                    return `${svgP.x},${svgP.y}`;
+                }).join(" ");
+                solutionPoly = <polygon points={polyPoints} fill="rgba(34, 197, 94, 0.2)" stroke="#22c55e" strokeWidth="0.1" strokeDasharray="0.2" className="pop-in" />;
+            }
+
+            return (
+                <div className="relative w-full aspect-square bg-slate-900 rounded-lg border-4 border-indigo-900 shadow-2xl overflow-hidden">
+                    {showWrong && <div className="absolute inset-0 bg-red-500/20 z-20 pointer-events-none flash-success"></div>}
+
+                    <svg viewBox={`0 0 ${viewBoxSize} ${viewBoxSize}`} className="w-full h-full magnify-cursor">
+                        {/* Grid */}
+                        {gridLines}
+                        {labels}
+
+                        {/* Solution Polygon */}
+                        {solutionPoly}
+
+                        {/* Axis Labels */}
+                        <text x={viewBoxSize / 2} y={viewBoxSize - 0.2} fontSize="0.4" fill="#a5b4fc" textAnchor="middle" fontWeight="bold">X Axis</text>
+                        <text x={0.2} y={viewBoxSize / 2} fontSize="0.4" fill="#a5b4fc" textAnchor="middle" fontWeight="bold" transform={`rotate(-90, 0.4, ${viewBoxSize / 2})`}>Y Axis</text>
+
+                        {/* Evidence Points (Given) */}
+                        {problem.visiblePoints.map((p, i) => {
+                            const pos = toSvg(p.x, p.y);
+                            return (
+                                <g key={`ev-${i}`}>
+                                    <circle cx={pos.x} cy={pos.y} r="0.15" fill="#3b82f6" />
+                                    <circle cx={pos.x} cy={pos.y} r="0.25" stroke="#60a5fa" strokeWidth="0.05" className="evidence-marker" />
+                                </g>
+                            );
+                        })}
+
+                        {/* User Guess */}
+                        {userGuess && (
+                            <g>
+                                <circle cx={toSvg(userGuess.x, userGuess.y).x} cy={toSvg(userGuess.x, userGuess.y).y} r="0.15" fill={isSolved ? "#22c55e" : "#facc15"} />
+                                {!isSolved && (
+                                    <circle cx={toSvg(userGuess.x, userGuess.y).x} cy={toSvg(userGuess.x, userGuess.y).y} r="0.3" stroke="#facc15" strokeWidth="0.05" strokeDasharray="0.1" className="animate-spin-slow" />
+                                )}
+                            </g>
+                        )}
+
+                        {/* Interaction Layer */}
+                        {!isSolved && interactables}
+                    </svg>
+                </div>
+            );
+        };
+
+        const CaseFile = ({ problem, score, level }) => {
+            return (
+                <div className="bg-[#fdfbf7] text-slate-800 p-6 rounded-sm shadow-xl relative max-w-sm rotate-1 font-typewriter border-l-8 border-orange-200">
+                    {/* Paper Clip */}
+                    <div className="absolute -top-3 right-6 w-4 h-12 bg-gray-400 rounded-full border border-gray-500 shadow-sm z-10"></div>
+
+                    <div className="border-b-2 border-slate-300 pb-2 mb-4 flex justify-between items-center">
+                        <h2 className="text-xl font-bold uppercase tracking-widest text-red-700">Case File #{level}</h2>
+                        <div className="text-xs bg-slate-200 px-2 py-1 rounded">CONFIDENTIAL</div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div>
+                            <strong className="block text-slate-500 text-xs uppercase">Subject:</strong>
+                            <div className="text-lg font-bold">The Phantom {problem.shapeName}</div>
+                        </div>
+
+                        <div>
+                            <strong className="block text-slate-500 text-xs uppercase">Known Evidence:</strong>
+                            <ul className="list-disc pl-5 font-mono text-sm space-y-1 mt-1">
+                                {problem.visiblePoints.map((p, i) => (
+                                    <li key={i}>Point: <span className="font-bold">({p.x}, {p.y})</span></li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        <div>
+                            <strong className="block text-slate-500 text-xs uppercase">Mission:</strong>
+                            <p className="text-sm">
+                                Find the missing 4th coordinate to complete the <span className="underline decoration-red-400 decoration-wavy">{problem.shapeName}</span>.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="mt-8 pt-4 border-t-2 border-slate-300 flex justify-between items-end">
+                        <div>
+                            <div className="text-xs uppercase text-slate-500">Detective Rank</div>
+                            <div className="font-bold text-indigo-700">
+                                {score < 3 ? "Rookie" : score < 7 ? "Investigator" : "Chief Inspector"}
+                            </div>
+                        </div>
+                        <div className="text-3xl font-bold text-slate-300">
+                            {score}/10
+                        </div>
+                    </div>
+
+                    {/* Stamp */}
+                    <div className="absolute bottom-4 right-4 opacity-10 rotate-[-15deg] border-4 border-red-600 p-2 text-red-600 font-bold text-xl uppercase rounded">
+                        Top Secret
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [problem, setProblem] = useState(null);
+            const [userGuess, setUserGuess] = useState(null);
+            const [isSolved, setIsSolved] = useState(false);
+            const [score, setScore] = useState(0);
+            const [level, setLevel] = useState(1);
+            const [feedback, setFeedback] = useState("Click on the grid to locate the missing corner.");
+            const [showWrong, setShowWrong] = useState(false);
+
+            // Initial Load
+            useEffect(() => {
+                setProblem(generateProblem());
+            }, []);
+
+            const handleCellClick = (x, y) => {
+                if (isSolved) return;
+
+                setUserGuess({ x, y });
+
+                if (x === problem.hiddenPoint.x && y === problem.hiddenPoint.y) {
+                    // Correct!
+                    setIsSolved(true);
+                    setFeedback("Match confirmed! The shape is complete.");
+                    setScore(s => s + 1);
+                } else {
+                    // Incorrect
+                    setFeedback("Negative match. That point doesn't create parallel sides.");
+                    setShowWrong(true);
+                    setTimeout(() => setShowWrong(false), 500);
+                }
+            };
+
+            const nextCase = () => {
+                setIsSolved(false);
+                setUserGuess(null);
+                setFeedback("New evidence found. Analyzing coordinates...");
+                setProblem(generateProblem());
+                setLevel(l => l + 1);
+            };
+
+            if (!problem) return <div className="text-white text-center mt-20">Loading Case Files...</div>;
+
+            return (
+                <div className="min-h-screen p-4 flex flex-col items-center justify-center relative overflow-hidden">
+
+                    {/* Background elements */}
+                    <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-20">
+                        <div className="absolute top-10 left-10 w-32 h-32 border border-blue-500 rounded-full"></div>
+                        <div className="absolute bottom-20 right-20 w-64 h-64 border border-blue-500 rounded-full border-dashed"></div>
+                    </div>
+
+                    {/* Header */}
+                    <div className="text-center mb-8 relative z-10">
+                        <h1 className="text-4xl md:text-5xl font-typewriter text-blue-300 drop-shadow-lg flex items-center justify-center gap-3">
+                            <MagnifyingGlass />
+                            Missing Corner Mystery
+                        </h1>
+                        <p className="text-blue-200/60 font-mono mt-2 text-sm tracking-wider">GEOMETRY DIVISION • CASE LOG 2025</p>
+                    </div>
+
+                    <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+
+                        {/* Left: Case File */}
+                        <div className="flex justify-center md:justify-end">
+                            <CaseFile problem={problem} score={score} level={level} />
+                        </div>
+
+                        {/* Right: The Grid */}
+                        <div className="flex flex-col max-w-lg w-full">
+
+                            {/* Feedback Bar */}
+                            <div className={`mb-4 p-3 rounded border-l-4 font-mono text-sm transition-all duration-300 shadow-lg ${isSolved ? 'bg-green-900/50 border-green-500 text-green-200' :
+                                    showWrong ? 'bg-red-900/50 border-red-500 text-red-200' :
+                                        'bg-indigo-900/50 border-blue-500 text-blue-200'
+                                }`}>
+                                <div className="flex items-center gap-2">
+                                    {isSolved ? <Check /> : showWrong ? <XMark /> : <div className="w-6 h-6 rounded-full border-2 border-blue-400 border-t-transparent animate-spin"></div>}
+                                    <span>{feedback}</span>
+                                </div>
+                            </div>
+
+                            <Grid
+                                problem={problem}
+                                userGuess={userGuess}
+                                onCellClick={handleCellClick}
+                                isSolved={isSolved}
+                                showWrong={showWrong}
+                            />
+
+                            {/* Controls */}
+                            <div className="mt-6 flex justify-center">
+                                {isSolved && (
+                                    <button
+                                        onClick={nextCase}
+                                        className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded shadow-lg transition transform hover:-translate-y-1 font-typewriter flex items-center gap-2"
+                                    >
+                                        <Folder /> Next Case
+                                    </button>
+                                )}
+                                {!isSolved && userGuess && !showWrong && (
+                                    <div className="text-slate-400 text-xs font-mono text-center animate-pulse">
+                                        Analyze the grid... find the corner that makes a rectangle.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-12 text-slate-500 text-xs font-mono">
+                        Skill Target: LL.4 (Graphing Triangles and Quadrilaterals) • 5th Grade Math
+                    </div>
+
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ben 10: DNA Match (Circle Theorem)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+        body {
+            background-color: #050505;
+            color: #39ff14;
+            font-family: 'Orbitron', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            /* Prevent scrolling while dragging */
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            box-shadow: 0 0 50px rgba(57, 255, 20, 0.2);
+            border-radius: 50%;
+            background: radial-gradient(circle at center, #0a1a0a 0%, #000000 70%);
+        }
+
+        .hud-panel {
+            position: absolute;
+            top: 20px;
+            width: 90%;
+            max-width: 600px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+
+        .data-box {
+            background: rgba(0, 20, 0, 0.8);
+            border: 2px solid #39ff14;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 0 15px rgba(57, 255, 20, 0.3);
+            min-width: 140px;
+        }
+
+        .data-label {
+            font-size: 0.8rem;
+            color: #88ff88;
+            text-transform: uppercase;
+        }
+
+        .data-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        #message-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 10;
+        }
+
+        .success-text {
+            font-size: 3rem;
+            color: #fff;
+            text-shadow: 0 0 20px #39ff14, 0 0 40px #39ff14;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            border: 3px solid #39ff14;
+        }
+
+        .instruction {
+            position: absolute;
+            bottom: 30px;
+            color: #fff;
+            text-align: center;
+            font-size: 1rem;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 1px solid #555;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+
+        <!-- HUD -->
+        <div class="hud-panel">
+            <div class="data-box" style="border-color: #ff3333;">
+                <div class="data-label">Target Sample</div>
+                <div class="data-value" style="color: #ff3333;" id="target-angle">0°</div>
+                <div class="data-label">Chord: <span id="target-chord">0</span></div>
+            </div>
+            <div class="data-box">
+                <div class="data-label">Your DNA</div>
+                <div class="data-value" id="player-angle">0°</div>
+                <div class="data-label">Chord: <span id="player-chord">0</span></div>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="message-overlay">
+            <div class="success-text">DNA MATCHED!<br><span style="font-size: 1.5rem">Theorem Proved</span></div>
+        </div>
+
+        <div class="instruction">
+            Drag the <span style="color: #39ff14; font-weight:bold;">GREEN ORB</span> to match the Red Chord's length!
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const targetAngleDisplay = document.getElementById('target-angle');
+        const playerAngleDisplay = document.getElementById('player-angle');
+        const targetChordDisplay = document.getElementById('target-chord');
+        const playerChordDisplay = document.getElementById('player-chord');
+        const messageOverlay = document.getElementById('message-overlay');
+
+        let width, height, cx, cy, radius;
+        let dragging = false;
+
+        // Game State
+        // Angles are in radians
+        const targetStartAngle = Math.PI * 0.8; // Roughly bottom left
+        const targetSpan = Math.PI / 2; // 90 degrees
+        const targetEndAngle = targetStartAngle + targetSpan;
+
+        // Player Chord
+        let playerStartAngle = Math.PI * 1.8; // Top right area
+        let playerEndAngle = playerStartAngle + (Math.PI / 4); // Start smaller
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            cx = width / 2;
+            cy = height / 2;
+            // Radius is 35% of the smaller dimension
+            radius = Math.min(width, height) * 0.35;
+            draw();
+        }
+
+        window.addEventListener('resize', resize);
+
+        // Interaction Logic
+        function getMousePos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = evt.clientX || evt.touches[0].clientX;
+            const clientY = evt.clientY || evt.touches[0].clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        function isClickingKnob(pos) {
+            // Calculate position of the player's draggable end point
+            const px = cx + radius * Math.cos(playerEndAngle);
+            const py = cy + radius * Math.sin(playerEndAngle);
+            const dist = Math.hypot(pos.x - px, pos.y - py);
+            return dist < 40; // Hitbox size
+        }
+
+        function updateDrag(pos) {
+            // Calculate angle from center to mouse
+            let angle = Math.atan2(pos.y - cy, pos.x - cx);
+
+            // Ensure angle doesn't flip weirdly, keep it positive/continuous logic if needed
+            // For this simple radial drag, atan2 is usually sufficient.
+
+            // However, we want to constrain the drag so the chord doesn't invert or overlap the target too messily.
+            // Let's just set the end angle to the mouse angle.
+
+            // Prevent matching the start angle exactly to avoid 0 length weirdness
+            if (Math.abs(angle - playerStartAngle) < 0.1) return;
+
+            playerEndAngle = angle;
+            draw();
+            checkWin();
+        }
+
+        // Event Listeners
+        canvas.addEventListener('mousedown', (e) => {
+            if (isClickingKnob(getMousePos(e))) dragging = true;
+        });
+        canvas.addEventListener('mousemove', (e) => {
+            if (dragging) updateDrag(getMousePos(e));
+            else {
+                // Cursor hover effect
+                const pos = getMousePos(e);
+                canvas.style.cursor = isClickingKnob(pos) ? 'pointer' : 'default';
+            }
+        });
+        canvas.addEventListener('mouseup', () => dragging = false);
+
+        // Touch support
+        canvas.addEventListener('touchstart', (e) => {
+            if (isClickingKnob(getMousePos(e))) {
+                dragging = true;
+                e.preventDefault(); // Stop scroll
+            }
+        });
+        canvas.addEventListener('touchmove', (e) => {
+            if (dragging) {
+                updateDrag(getMousePos(e));
+                e.preventDefault();
+            }
+        });
+        canvas.addEventListener('touchend', () => dragging = false);
+
+
+        // Drawing Helpers
+        function drawPoint(angle, color, isKnob = false) {
+            const x = cx + radius * Math.cos(angle);
+            const y = cy + radius * Math.sin(angle);
+
+            ctx.beginPath();
+            ctx.arc(x, y, isKnob ? 15 : 8, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+
+            if (isKnob) {
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                // Glow effect
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 20;
+                ctx.stroke();
+                ctx.shadowBlur = 0; // Reset
+            }
+        }
+
+        function drawChord(startA, endA, color, label) {
+            const x1 = cx + radius * Math.cos(startA);
+            const y1 = cy + radius * Math.sin(startA);
+            const x2 = cx + radius * Math.cos(endA);
+            const y2 = cy + radius * Math.sin(endA);
+
+            // Draw Triangle lines (Radii)
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.lineTo(cx, cy); // Close triangle
+            ctx.strokeStyle = color; // Low opacity radii
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw Chord (Thick)
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            // Draw Angle Arc
+            const startDeg = startA * 180 / Math.PI;
+            const endDeg = endA * 180 / Math.PI;
+
+            // Normalize angle span calculation for the arc
+            // We need to draw the arc inside the triangle
+            ctx.beginPath();
+            // Check which way creates the minor arc
+            let diff = endA - startA;
+            // Normalize diff to -PI to PI
+            while (diff <= -Math.PI) diff += 2 * Math.PI;
+            while (diff > Math.PI) diff -= 2 * Math.PI;
+
+            ctx.arc(cx, cy, radius * 0.25, startA, startA + diff, diff < 0);
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = 0.5;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+        }
+
+        function getAngleDiff(a1, a2) {
+            let diff = Math.abs(a1 - a2);
+            while (diff > Math.PI * 2) diff -= Math.PI * 2;
+            // We want the minor arc angle
+            if (diff > Math.PI) diff = (Math.PI * 2) - diff;
+            return diff;
+        }
+
+        function toDegrees(rad) {
+            return Math.round(rad * (180 / Math.PI));
+        }
+
+        function getChordLength(angleDiff) {
+            // Chord length formula: 2r * sin(theta/2)
+            // We'll just return a scaled unitless value for display simplicity
+            return Math.round(2 * radius * Math.sin(angleDiff / 2) / (radius / 50));
+        }
+
+        function checkWin() {
+            const targetDiff = getAngleDiff(targetStartAngle, targetEndAngle);
+            const playerDiff = getAngleDiff(playerStartAngle, playerEndAngle);
+
+            // Calculate degrees for display
+            const targetDeg = toDegrees(targetDiff);
+            const playerDeg = toDegrees(playerDiff);
+
+            // Update DOM
+            targetAngleDisplay.innerText = targetDeg + "°";
+            targetChordDisplay.innerText = getChordLength(targetDiff);
+
+            playerAngleDisplay.innerText = playerDeg + "°";
+            playerChordDisplay.innerText = getChordLength(playerDiff);
+
+            // Win logic (within 3 degree tolerance)
+            if (Math.abs(targetDeg - playerDeg) <= 3) {
+                messageOverlay.style.opacity = 1;
+                document.body.style.backgroundColor = "#0a2a0a"; // Slight green tint
+                return true;
+            } else {
+                messageOverlay.style.opacity = 0;
+                document.body.style.backgroundColor = "#050505";
+                return false;
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            // 1. Draw Main Circle
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = '#39ff14';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#39ff14';
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // 2. Draw Center (Omnitrix Core)
+            ctx.beginPath();
+            ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            // Inner symbol
+            ctx.beginPath();
+            ctx.moveTo(cx - 6, cy + 8);
+            ctx.lineTo(cx + 6, cy - 8);
+            ctx.moveTo(cx + 6, cy + 8);
+            ctx.lineTo(cx - 6, cy - 8);
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 3. Draw Target Chord (Fixed - Red)
+            drawChord(targetStartAngle, targetEndAngle, '#ff3333', 'Sample');
+            drawPoint(targetStartAngle, '#ff3333');
+            drawPoint(targetEndAngle, '#ff3333');
+
+            // 4. Draw Player Chord (Interactive - Green)
+            drawChord(playerStartAngle, playerEndAngle, '#39ff14', 'You');
+            drawPoint(playerStartAngle, '#39ff14'); // Anchor
+            drawPoint(playerEndAngle, '#39ff14', true); // Draggable Knob
+
+            // 5. Draw Theorem Text visualization
+            // If matched, draw a connecting line or effect
+            if (messageOverlay.style.opacity == '1') {
+                ctx.font = "20px Orbitron";
+                ctx.fillStyle = "white";
+                ctx.textAlign = "center";
+                ctx.fillText("EQUAL CHORDS = EQUAL ANGLES", cx, cy + radius + 50);
+            }
+        }
+
+        // Initialize
+        resize();
+        checkWin();
+
+    </script>
+
+</body>
+
+</html>

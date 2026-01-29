@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Phineas & Ferb: Engineering Challenge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Roboto:wght@400;700&display=swap');
+
+        body {
+            background-color: #87CEEB;
+            font-family: 'Roboto', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Blueprint Grid Background */
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background-color: #2c3e50;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            background: #34495e;
+            /* Blueprint Blue */
+            border: 4px solid #fff;
+        }
+
+        /* Question Panel */
+        .question-panel {
+            position: absolute;
+            bottom: 20px;
+            width: 90%;
+            max-width: 600px;
+            background: #f1c40f;
+            /* Phineas Yellow */
+            border: 4px solid #e67e22;
+            border-radius: 15px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 10px 0 #c0392b;
+            transition: transform 0.3s;
+        }
+
+        .question-text {
+            font-family: 'Fredoka One', cursive;
+            color: #2c3e50;
+            font-size: 1.2rem;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        input[type="number"] {
+            padding: 10px;
+            font-size: 1.2rem;
+            border-radius: 8px;
+            border: 2px solid #2c3e50;
+            width: 100px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        button.action-btn {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            border-radius: 8px;
+            font-family: 'Fredoka One', cursive;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #27ae60;
+            transition: transform 0.1s;
+        }
+
+        button.action-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        /* HUD */
+        .score-board {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 3px solid #2980b9;
+            font-family: 'Fredoka One', cursive;
+            font-size: 1.5rem;
+            color: #2980b9;
+        }
+
+        .hint-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: #008B8B;
+            /* Perry Teal */
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-weight: bold;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #005f5f;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Feedback Overlay */
+        .feedback {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Fredoka One', cursive;
+            font-size: 4rem;
+            text-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            z-index: 20;
+        }
+
+        .correct {
+            color: #2ecc71;
+        }
+
+        .wrong {
+            color: #e74c3c;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <div class="score-board">Parts: <span id="score">0</span>/10</div>
+        <button class="hint-btn" onclick="toggleHint()">?</button>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="feedback" id="feedback-msg">AWESOME!</div>
+
+        <div class="question-panel">
+            <div class="question-text" id="q-text">Loading puzzle...</div>
+            <div class="input-group">
+                <input type="number" id="answer-input" placeholder="?">
+                <button class="action-btn" onclick="checkAnswer()">CHECK</button>
+            </div>
+            <div id="math-hint" style="margin-top:5px; font-size:0.9rem; color:#555; display:none;">
+                Hint: Use Pythagoras (a² + b² = c²)
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const qText = document.getElementById('q-text');
+        const feedbackMsg = document.getElementById('feedback-msg');
+        const scoreDisplay = document.getElementById('score');
+        const inputField = document.getElementById('answer-input');
+        const hintDiv = document.getElementById('math-hint');
+
+        let width, height, cx, cy, radius;
+        let score = 0;
+
+        // Current Question State
+        let currentQ = {};
+        let showHint = false;
+
+        // Pythagorean Triples generator for clean numbers
+        const triples = [
+            [3, 4, 5],
+            [5, 12, 13],
+            [6, 8, 10], // Multiples
+            [8, 15, 17],
+            [7, 24, 25],
+            [9, 12, 15],
+            [10, 24, 26],
+            [12, 16, 20]
+        ];
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            // Keep canvas square-ish but fitting
+            const size = Math.min(width, height) * 0.85;
+            canvas.width = size;
+            canvas.height = size * 0.8; // Slightly rectangular for blueprint look
+
+            cx = canvas.width / 2;
+            cy = canvas.height / 2;
+            radius = Math.min(canvas.width, canvas.height) * 0.35;
+
+            draw();
+        }
+
+        window.addEventListener('resize', resize);
+
+        function generateQuestion() {
+            // Pick a random triple (a, b, c) where a^2 + b^2 = c^2
+            // In our circle context:
+            // c = Radius (Hypotenuse)
+            // a = Distance from center (OM)
+            // b = Half Chord Length (AM)
+
+            const triple = triples[Math.floor(Math.random() * triples.length)];
+            // Randomly swap a and b to vary orientation (Distance vs Half-Chord)
+            const swap = Math.random() > 0.5;
+            const distOM = swap ? triple[1] : triple[0];
+            const halfChord = swap ? triple[0] : triple[1];
+            const rad = triple[2];
+
+            // Decide what to ask for
+            const types = ['FIND_CHORD', 'FIND_RADIUS', 'FIND_DISTANCE'];
+            const type = types[Math.floor(Math.random() * types.length)];
+
+            currentQ = {
+                type: type,
+                om: distOM,
+                am: halfChord,
+                radius: rad,
+                chord: halfChord * 2,
+                solved: false
+            };
+
+            // Construct Text
+            if (type === 'FIND_CHORD') {
+                qText.innerHTML = `Radius is <b>${rad}</b>. Distance from center is <b>${distOM}</b>.<br>Find the full length of the Chord.`;
+                currentQ.answer = currentQ.chord;
+            } else if (type === 'FIND_RADIUS') {
+                qText.innerHTML = `Chord length is <b>${currentQ.chord}</b>. Distance from center is <b>${distOM}</b>.<br>Find the Radius.`;
+                currentQ.answer = currentQ.radius;
+            } else if (type === 'FIND_DISTANCE') {
+                qText.innerHTML = `Radius is <b>${rad}</b>. Chord length is <b>${currentQ.chord}</b>.<br>How far is the chord from the center?`;
+                currentQ.answer = currentQ.om;
+            }
+
+            inputField.value = '';
+            inputField.focus();
+            showHint = false;
+            hintDiv.style.display = 'none';
+            draw();
+        }
+
+        function toggleHint() {
+            showHint = !showHint;
+            hintDiv.style.display = showHint ? 'block' : 'none';
+            draw();
+        }
+
+        function checkAnswer() {
+            if (currentQ.solved) return;
+
+            const val = parseFloat(inputField.value);
+            if (val === currentQ.answer) {
+                // Correct
+                feedbackMsg.innerText = "GENIUS!";
+                feedbackMsg.className = "feedback correct";
+                feedbackMsg.style.opacity = 1;
+                feedbackMsg.style.transform = "translate(-50%, -50%) scale(1.2)";
+
+                score++;
+                scoreDisplay.innerText = score;
+                currentQ.solved = true;
+
+                // Draw the solution state
+                draw();
+
+                setTimeout(() => {
+                    feedbackMsg.style.opacity = 0;
+                    feedbackMsg.style.transform = "translate(-50%, -50%) scale(1)";
+                    generateQuestion();
+                }, 2000);
+
+            } else {
+                // Wrong
+                feedbackMsg.innerText = "TRY AGAIN!";
+                feedbackMsg.className = "feedback wrong";
+                feedbackMsg.style.opacity = 1;
+                setTimeout(() => {
+                    feedbackMsg.style.opacity = 0;
+                }, 1000);
+            }
+        }
+
+        // Drawing Logic
+        function draw() {
+            if (!cx) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Background Grid Lines (Blueprint style)
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let i = 0; i < canvas.width; i += 20) { ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); }
+            for (let i = 0; i < canvas.height; i += 20) { ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); }
+            ctx.stroke();
+
+            // 1. Draw Circle
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = '#ecf0f1';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Calculate positions relative to radius for visualization
+            // We scale the visual representation so it always looks nice, 
+            // regardless of the actual numbers (e.g. radius 5 or 25 both fit the screen)
+
+            // Visual constants
+            const visRadius = radius;
+
+            // We need the visual ratio. 
+            // If question says r=5, om=3, am=4.
+            // Visually: r = 100%, om = 60%, am = 80%.
+            const ratioOM = currentQ.om / currentQ.radius;
+            const ratioAM = currentQ.am / currentQ.radius;
+
+            const chordY = cy + (visRadius * ratioOM); // Move down by OM
+            const chordStartX = cx - (visRadius * ratioAM);
+            const chordEndX = cx + (visRadius * ratioAM);
+
+            // 2. Draw Center
+            ctx.fillStyle = '#f1c40f';
+            ctx.beginPath();
+            ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.fillText("O", cx - 10, cy - 10);
+
+            // 3. Draw Chord
+            ctx.beginPath();
+            ctx.moveTo(chordStartX, chordY);
+            ctx.lineTo(chordEndX, chordY);
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = '#e67e22'; // Orange Chord
+            ctx.stroke();
+
+            // 4. Draw Perpendicular (OM)
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx, chordY);
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Right Angle marker
+            ctx.beginPath();
+            ctx.strokeStyle = '#2ecc71';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(cx, chordY - 15, 15, 15);
+            ctx.stroke();
+
+            // Label M
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px Arial';
+            ctx.fillText("M", cx - 5, chordY + 20);
+
+            // 5. Draw Radius (OA) - The Hypotenuse
+            // We draw the triangle O-M-A (Left side)
+            ctx.beginPath();
+            ctx.moveTo(cx, cy); // O
+            ctx.lineTo(chordStartX, chordY); // A
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#3498db'; // Blue Radius
+            ctx.stroke();
+
+            // 6. Highlight the Triangle if Hint is ON or Solved
+            if (showHint || currentQ.solved) {
+                ctx.fillStyle = "rgba(52, 152, 219, 0.2)";
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(chordStartX, chordY);
+                ctx.lineTo(cx, chordY);
+                ctx.fill();
+            }
+
+            // 7. LABELS (The important part!)
+            ctx.font = "bold 20px Arial";
+            ctx.fillStyle = "#fff";
+            ctx.textAlign = "center";
+
+            // Label Radius
+            const rMidX = (cx + chordStartX) / 2;
+            const rMidY = (cy + chordY) / 2;
+            const radText = (currentQ.type === 'FIND_RADIUS' && !currentQ.solved) ? "?" : currentQ.radius;
+            drawLabelBox(ctx, rMidX - 20, rMidY - 20, "r = " + radText, '#3498db');
+
+            // Label OM (Distance)
+            const omText = (currentQ.type === 'FIND_DISTANCE' && !currentQ.solved) ? "?" : currentQ.om;
+            // Position slightly right of the dashed line
+            drawLabelBox(ctx, cx + 10, cy + (chordY - cy) / 2, "dist = " + omText, '#95a5a6');
+
+            // Label AM or Chord
+            // If asking for Chord, we might label AM as "x" or label the whole chord
+            const amMidX = (cx + chordStartX) / 2;
+
+            if (currentQ.type === 'FIND_CHORD') {
+                // Label the whole chord
+                const chordText = currentQ.solved ? currentQ.chord : "?";
+                drawLabelBox(ctx, cx, chordY + 30, "Chord = " + chordText, '#e67e22');
+
+                // Also label half-chord if hint
+                if (showHint) {
+                    drawLabelBox(ctx, amMidX, chordY - 15, currentQ.am, '#e67e22');
+                }
+            } else {
+                // Label the half chord AM usually, unless we gave the whole chord
+                if (currentQ.type === 'FIND_RADIUS') {
+                    // We know the chord, so we know AM
+                    drawLabelBox(ctx, amMidX, chordY + 20, currentQ.am, '#e67e22');
+                    ctx.font = "14px Arial";
+                    ctx.fillText("(Half)", amMidX, chordY + 40);
+                } else {
+                    drawLabelBox(ctx, amMidX, chordY + 20, currentQ.am, '#e67e22');
+                }
+            }
+        }
+
+        function drawLabelBox(context, x, y, text, color) {
+            context.save();
+            context.font = "bold 16px Roboto";
+            const width = context.measureText(text).width + 10;
+            context.fillStyle = color;
+            context.fillRect(x - width / 2, y - 12, width, 24);
+            context.fillStyle = "white";
+            context.textAlign = "center";
+            context.textBaseline = "middle";
+            context.fillText(text, x, y);
+            context.restore();
+        }
+
+        // Init
+        resize();
+        generateQuestion();
+
+        // Allow Enter key
+        inputField.addEventListener("keypress", function (event) {
+            if (event.key === "Enter") {
+                checkAnswer();
+            }
+        });
+
+    </script>
+
+</body>
+
+</html>
