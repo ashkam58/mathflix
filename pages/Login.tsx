@@ -48,8 +48,8 @@ export const Login: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-black bg-opacity-75 bg-[url('https://assets.nflxext.com/ffe/siteui/vlv3/f841d4c7-10e1-40af-bcae-07a3f8dc141a/f6d7434e-d6de-4185-a6d4-c77a2d08737b/US-en-20220502-popsignuptwoweeks-perspective_alpha_website_medium.jpg')] bg-cover bg-blend-overlay flex flex-col">
-      <div className="px-4 md:px-12 py-4">
-        <Link to="/" className="text-red-600 text-4xl font-bold tracking-tighter cursor-pointer block">
+      <div className="px-6 md:px-16 py-6">
+        <Link to="/" className="text-netflixRed text-4xl font-bold tracking-tighter cursor-pointer block drop-shadow-md">
           MATHFLIX
         </Link>
       </div>

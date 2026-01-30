@@ -31,8 +31,8 @@ export const Navbar: React.FC<NavbarProps> = ({ user }) => {
   return (
     <nav
       className={`fixed w-full top-0 z-50 transition-all duration-500 border-b ${isScrolled
-        ? 'bg-[#141414]/90 backdrop-blur-md border-white/5 py-3'
-        : 'bg-gradient-to-b from-black/90 to-transparent border-transparent py-5'
+        ? 'bg-[#141414]/90 backdrop-blur-md border-white/5 py-4'
+        : 'bg-gradient-to-b from-black/90 to-transparent border-transparent py-6'
         }`}
     >
       <div className="px-6 md:px-16 flex items-center justify-between">

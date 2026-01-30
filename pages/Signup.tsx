@@ -23,8 +23,8 @@ export const Signup: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <div className="px-4 md:px-12 py-6 border-b border-gray-200 flex justify-between items-center">
-        <Link to="/" className="text-red-600 text-4xl font-bold tracking-tighter cursor-pointer block">
+      <div className="px-6 md:px-16 py-6 border-b border-gray-200 flex justify-between items-center">
+        <Link to="/" className="text-netflixRed text-4xl font-bold tracking-tighter cursor-pointer block">
           MATHFLIX
         </Link>
         <Link to="/login" className="text-black text-lg font-semibold hover:underline">
