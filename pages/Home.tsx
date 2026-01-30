@@ -160,7 +160,7 @@ export const Home: React.FC = () => {
 
             {/* Hero Content with Staggered Animation */}
             <motion.div
-              className="absolute bottom-[15%] left-6 md:left-16 max-w-2xl space-y-6"
+              className="absolute bottom-[20%] left-6 md:left-16 max-w-3xl space-y-8"
               variants={heroVariants}
               initial="hidden"
               animate="visible"
@@ -168,7 +168,7 @@ export const Home: React.FC = () => {
               {/* Animated Title */}
               <motion.h1
                 variants={itemVariants}
-                className="text-5xl md:text-7xl font-bold text-white drop-shadow-2xl leading-tight"
+                className="text-6xl md:text-8xl font-black text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] leading-none tracking-tight font-display"
               >
                 {featuredGame.title}
               </motion.h1>
@@ -176,7 +176,7 @@ export const Home: React.FC = () => {
               {/* Animated Description */}
               <motion.p
                 variants={itemVariants}
-                className="text-lg md:text-xl text-gray-200 drop-shadow-md line-clamp-3 max-w-lg"
+                className="text-xl md:text-2xl text-gray-100 drop-shadow-md line-clamp-3 max-w-2xl font-medium"
               >
                 {featuredGame.description}
               </motion.p>
@@ -184,53 +184,53 @@ export const Home: React.FC = () => {
               {/* Animated Buttons */}
               <motion.div
                 variants={itemVariants}
-                className="flex gap-5 mt-8"
+                className="flex gap-6 mt-10"
               >
                 <Link to={`/play/${featuredGame.id}`}>
                   <motion.button
-                    className="flex items-center gap-3 bg-white text-black px-8 py-3.5 rounded-md font-semibold text-lg shadow-lg"
+                    className="flex items-center gap-4 bg-netflixRed text-white px-10 py-4 rounded-lg font-bold text-xl shadow-[0_0_20px_rgba(229,9,20,0.4)] hover:shadow-[0_0_30px_rgba(229,9,20,0.6)] transition-shadow"
                     variants={buttonVariants}
                     whileHover="hover"
                     whileTap="tap"
                   >
-                    <Play size={22} className="fill-black" /> Play
+                    <Play size={28} className="fill-white" /> Play
                   </motion.button>
                 </Link>
                 <motion.button
-                  className="flex items-center gap-3 bg-gray-500/40 text-white px-7 py-3.5 rounded-md font-semibold text-lg backdrop-blur-sm border border-white/20"
+                  className="flex items-center gap-4 bg-white/10 text-white px-9 py-4 rounded-lg font-bold text-xl backdrop-blur-md border border-white/20 hover:bg-white/20 transition-colors"
                   variants={buttonVariants}
                   whileHover="hover"
                   whileTap="tap"
                   onClick={() => setPreviewGame(featuredGame)}
                 >
-                  <Info size={22} /> More Info
+                  <Info size={28} /> More Info
                 </motion.button>
               </motion.div>
 
               {/* Category Badge */}
               <motion.div
                 variants={itemVariants}
-                className="flex items-center gap-3 text-sm text-gray-400 mt-4"
+                className="flex items-center gap-4 text-base text-gray-300 mt-6 font-semibold tracking-wide"
               >
-                <span className="px-2 py-1 bg-red-600 text-white rounded text-xs font-bold">
+                <span className="px-3 py-1 bg-netflixRed text-white rounded-md text-xs font-bold shadow-lg shadow-red-900/40">
                   FEATURED
                 </span>
-                <span>{featuredGame.category}</span>
-                {featuredGame.grade && <span>• {featuredGame.grade}</span>}
+                <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-netflixRed"></div>{featuredGame.category}</span>
+                {featuredGame.grade && <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-gray-500"></div>{featuredGame.grade}</span>}
               </motion.div>
             </motion.div>
 
             {/* Scroll Indicator */}
             <motion.div
-              className="absolute bottom-8 left-1/2 -translate-x-1/2"
+              className="absolute bottom-10 left-1/2 -translate-x-1/2"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1, y: [0, 10, 0] }}
               transition={{
                 opacity: { delay: 2, duration: 0.5 },
-                y: { delay: 2, duration: 1.5, repeat: Infinity }
+                y: { delay: 2, duration: 2, repeat: Infinity }
               }}
             >
-              <ChevronDown size={32} className="text-white/50" />
+              <ChevronDown size={40} className="text-white/30" />
             </motion.div>
           </div>
         )}
@@ -240,15 +240,17 @@ export const Home: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.5 }}
-          className={`px-6 md:px-16 sticky top-[72px] z-40 py-5 bg-[#141414]/95 backdrop-blur border-b border-white/5 space-y-4 ${activeCategory !== 'All' || activeGradeFilter !== 'All' ? 'mt-24' : ''}`}
+          className={`px-6 md:px-16 sticky top-[72px] z-40 py-5 bg-gradient-to-b from-[#000000] via-[#000000]/80 to-transparent backdrop-blur-sm space-y-4 ${activeCategory !== 'All' || activeGradeFilter !== 'All' ? 'mt-24' : ''}`}
         >
-          {/* Categories */}
-          <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
+          {/* Combined Scroll Container */}
+          <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 items-center">
+
+            {/* Categories */}
             <button
               onClick={() => setActiveCategory('All')}
-              className={`px-5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${activeCategory === 'All'
-                ? 'bg-white text-black'
-                : 'text-gray-300 border border-gray-600 hover:border-white'
+              className={`px-5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 border ${activeCategory === 'All'
+                ? 'bg-netflixRed text-white border-netflixRed shadow-[0_0_15px_rgba(229,9,20,0.5)]'
+                : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10 hover:border-white/30'
                 }`}
             >
               All Categories
@@ -257,24 +259,25 @@ export const Home: React.FC = () => {
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat as Category)}
-                className={`px-5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${activeCategory === cat
-                  ? 'bg-white text-black'
-                  : 'text-gray-300 border border-gray-600 hover:border-white'
+                className={`px-5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 border ${activeCategory === cat
+                  ? 'bg-netflixRed text-white border-netflixRed shadow-[0_0_15px_rgba(229,9,20,0.5)]'
+                  : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10 hover:border-white/30'
                   }`}
               >
                 {cat}
               </button>
             ))}
-          </div>
 
-          {/* Grades Filter */}
-          <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 items-center">
-            <span className="text-sm text-gray-400 font-medium mr-2">GRADE LEVEL:</span>
+            {/* Vertical Divider */}
+            <div className="w-px h-8 bg-white/20 mx-2 flex-shrink-0"></div>
+
+            {/* Grades */}
+            <span className="text-sm text-gray-500 font-medium whitespace-nowrap mr-1">GRADES:</span>
             <button
               onClick={() => setActiveGradeFilter('All')}
-              className={`px-4 py-1.5 rounded-full text-sm transition ${activeGradeFilter === 'All'
-                ? 'bg-white text-black'
-                : 'text-gray-400 border border-gray-600 hover:border-white hover:text-white'
+              className={`px-4 py-1.5 rounded-full text-sm transition-all duration-300 border ${activeGradeFilter === 'All'
+                ? 'bg-white text-black border-white shadow-[0_0_10px_rgba(255,255,255,0.3)]'
+                : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:border-white/30 hover:text-white'
                 }`}
             >
               Any
@@ -283,9 +286,9 @@ export const Home: React.FC = () => {
               <button
                 key={g}
                 onClick={() => setActiveGradeFilter(g)}
-                className={`px-4 py-1.5 rounded-full text-sm transition ${activeGradeFilter === g
-                  ? 'bg-white text-black'
-                  : 'text-gray-400 border border-gray-600 hover:border-white hover:text-white'
+                className={`px-4 py-1.5 rounded-full text-sm transition-all duration-300 border ${activeGradeFilter === g
+                  ? 'bg-white text-black border-white shadow-[0_0_10px_rgba(255,255,255,0.3)]'
+                  : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:border-white/30 hover:text-white'
                   }`}
               >
                 {g}

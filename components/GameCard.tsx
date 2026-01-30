@@ -62,10 +62,14 @@ export const GameCard: React.FC<GameCardProps> = ({ game, isLocked, onMoreInfo }
 
   return (
     <motion.div
-      className="relative h-56 cursor-pointer rounded-xl overflow-hidden shadow-xl group"
+      className="relative aspect-video cursor-pointer rounded-md overflow-hidden bg-[#181818] group z-10"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      whileHover={{ scale: 1.03, y: -5 }}
+      whileHover={{
+        scale: 1.05,
+        zIndex: 50,
+        boxShadow: `0 0 20px ${posterStyle.accent}40`
+      }}
       transition={{ duration: 0.3 }}
     >
       {/* Background */}
@@ -73,145 +77,89 @@ export const GameCard: React.FC<GameCardProps> = ({ game, isLocked, onMoreInfo }
         <img
           src={game.thumbnailUrl}
           alt={game.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           loading="lazy"
           onError={() => setImageError(true)}
         />
       ) : (
         /* Movie Poster Style Fallback */
         <div className={`w-full h-full bg-gradient-to-br ${posterStyle.gradient} relative overflow-hidden`}>
-          {/* Animated background pattern */}
+          {/* Animated background pattern based on category */}
           <div className="absolute inset-0 opacity-20">
-            <div className="absolute inset-0" style={{
-              backgroundImage: `radial-gradient(circle at 20% 50%, ${posterStyle.accent}20 0%, transparent 50%), 
-                               radial-gradient(circle at 80% 20%, ${posterStyle.accent}15 0%, transparent 40%),
-                               radial-gradient(circle at 40% 80%, ${posterStyle.accent}10 0%, transparent 30%)`
-            }} />
+            {/* Retro Math Pixel Grid */}
+            {game.category === Category.MATH && (
+              <div className="absolute inset-0" style={{ backgroundImage: `linear-gradient(${posterStyle.accent}20 1px, transparent 1px), linear-gradient(90deg, ${posterStyle.accent}20 1px, transparent 1px)`, backgroundSize: '20px 20px' }}></div>
+            )}
+            {/* Cyber Coding Scanlines */}
+            {game.category === Category.CODING && (
+              <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.5)_50%)] bg-[length:100%_4px]"></div>
+            )}
           </div>
 
-          {/* Floating decorative elements */}
+          {/* Floating decorative elements - reduced clutter */}
           <motion.div
-            className="absolute top-4 right-4 opacity-30"
+            className="absolute top-4 right-4 opacity-20"
             animate={{ rotate: 360 }}
             transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
           >
-            <Sparkles size={24} style={{ color: posterStyle.accent }} />
+            <Sparkles size={20} style={{ color: posterStyle.accent }} />
           </motion.div>
 
-          <motion.div
-            className="absolute bottom-12 left-4 opacity-20"
-            animate={{ y: [-5, 5, -5] }}
-            transition={{ duration: 3, repeat: Infinity }}
-          >
-            <Zap size={20} style={{ color: posterStyle.accent }} />
-          </motion.div>
-
-          {/* Main content */}
+          {/* Main content - Center Title/Icon if no image */}
           <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-            {/* Category Icon */}
             <motion.div
-              className="mb-3 p-3 rounded-full bg-white/10 backdrop-blur-sm"
+              className="mb-3 p-3 rounded-full bg-white/5 backdrop-blur-sm"
               animate={{ scale: [1, 1.1, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
+              transition={{ duration: 3, repeat: Infinity }}
             >
-              <CategoryIcon size={28} style={{ color: posterStyle.accent }} />
+              <CategoryIcon size={32} style={{ color: posterStyle.accent }} />
             </motion.div>
+          </div>
+        </div>
+      )}
 
-            {/* Topic/Title */}
-            <h3 className="text-white font-bold text-xl leading-tight drop-shadow-lg mb-2 line-clamp-2">
-              {displayTopic}
-            </h3>
+      {/* Content Overlay - Always visible gradient for text readability, enhanced on hover */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent flex flex-col justify-end p-4">
+        <div className="transform transition-transform duration-300 group-hover:-translate-y-10">
+          <h3 className="text-white font-bold text-lg leading-tight drop-shadow-md line-clamp-1">{game.title}</h3>
 
-            {/* Category label */}
-            <span className="text-xs uppercase tracking-widest opacity-60 text-white">
+          <div className="flex items-center gap-2 mt-1">
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-white/20 text-white`}>
               {game.category}
             </span>
+            {isLocked && (
+              <span className="text-[10px] uppercase font-bold text-yellow-500 flex items-center gap-1">
+                <Lock size={10} /> Premium
+              </span>
+            )}
           </div>
-
-          {/* Bottom gradient */}
-          <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/60 to-transparent" />
         </div>
-      )}
-
-      {/* Hover Overlay */}
-      <motion.div
-        className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/20 flex flex-col justify-end p-5"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: isHovered ? 1 : 0 }}
-        transition={{ duration: 0.2 }}
-      >
-        <motion.h4
-          className="text-white font-bold text-lg mb-2 line-clamp-1"
-          initial={{ y: 10 }}
-          animate={{ y: isHovered ? 0 : 10 }}
-        >
-          {game.title}
-        </motion.h4>
-        <motion.p
-          className="text-gray-300 text-sm line-clamp-2 mb-4"
-          initial={{ y: 10 }}
-          animate={{ y: isHovered ? 0 : 10 }}
-          transition={{ delay: 0.05 }}
-        >
-          {game.description}
-        </motion.p>
-
-        <motion.div
-          className="flex gap-3"
-          initial={{ y: 10, opacity: 0 }}
-          animate={{ y: isHovered ? 0 : 10, opacity: isHovered ? 1 : 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          {isLocked ? (
-            <div className="flex items-center gap-2 text-yellow-500">
-              <Lock size={18} />
-              <span className="text-sm font-medium">Premium</span>
-            </div>
-          ) : (
-            <>
-              <Link to={`/play/${game.id}`} onClick={(e) => e.stopPropagation()}>
-                <motion.button
-                  className="bg-white text-black rounded-lg px-4 py-2 flex items-center gap-2 font-medium"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Play size={16} className="fill-black" /> Play
-                </motion.button>
-              </Link>
-              <motion.button
-                className="border border-gray-400 text-white rounded-lg px-4 py-2 flex items-center gap-2"
-                whileHover={{ scale: 1.05, borderColor: '#fff' }}
-                whileTap={{ scale: 0.95 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMoreInfo?.(game);
-                }}
-              >
-                <Info size={16} /> Info
-              </motion.button>
-            </>
-          )}
-        </motion.div>
-      </motion.div>
-
-      {/* Premium Badge */}
-      {isLocked && (
-        <div className="absolute top-3 right-3 bg-gradient-to-r from-yellow-500 to-amber-500 text-black text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg">
-          PREMIUM
-        </div>
-      )}
-
-      {/* Category Tag */}
-      <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-sm text-white text-[10px] font-medium px-2.5 py-1 rounded-full">
-        {game.category}
       </div>
 
-      {/* Grade badge */}
-      {game.grade && (
-        <div className="absolute bottom-3 right-3 bg-white/20 backdrop-blur-sm text-white text-[10px] font-medium px-2 py-1 rounded opacity-0 group-hover:opacity-0">
-          {game.grade}
-        </div>
-      )}
+      {/* Hover Actions (Play/Info) - Slide in from bottom */}
+      <motion.div
+        className="absolute bottom-0 left-0 right-0 p-4 flex gap-2 translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-black/60 backdrop-blur-md"
+      >
+        {!isLocked ? (
+          <div className="flex gap-2 w-full">
+            <Link to={`/play/${game.id}`} className="flex-1" onClick={(e) => e.stopPropagation()}>
+              <button className="w-full bg-white text-black py-1.5 rounded text-sm font-bold flex items-center justify-center gap-2 hover:bg-gray-200 transition">
+                <Play size={14} className="fill-black" /> Play
+              </button>
+            </Link>
+            <button
+              className="p-1.5 rounded-full border border-gray-400 hover:border-white text-white transition"
+              onClick={(e) => { e.stopPropagation(); onMoreInfo?.(game); }}
+            >
+              <Info size={18} />
+            </button>
+          </div>
+        ) : (
+          <div className="w-full text-center text-xs text-gray-300 py-1">
+            Subscribe to play
+          </div>
+        )}
+      </motion.div>
     </motion.div>
   );
 };
