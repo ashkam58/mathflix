@@ -30,7 +30,7 @@ export const Login: React.FC = () => {
       // @ts-ignore
       window.google.accounts.id.renderButton(
         document.getElementById("googleIconLogin"),
-        { theme: "filled_black", size: "large", width: "100%" }
+        { theme: "filled_black", size: "large", width: "400" }
       );
     }
   }, []);
