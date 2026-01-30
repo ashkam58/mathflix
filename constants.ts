@@ -21,6 +21,20 @@ export const INITIAL_GAMES: Game[] = [
         content: ''
     },
     {
+        id: 'math-ninja-dojo-01',
+        title: 'Math Ninja Dojo',
+        description: 'Train your brain like a ninja! Solve math problems quickly to build combos and earn points. Features 8-bit chiptune music, pixel art styling, and three difficulty levels.',
+        category: Category.MATH,
+        grade: 'Grade 3-8',
+        topics: ['Mental Math', 'Arithmetic'],
+        subtopics: ['Addition', 'Subtraction', 'Multiplication', 'Division'],
+        thumbnailUrl: '/thumbnails/math-ninja-dojo.png',
+        type: 'url',
+        isPremium: false,
+        views: 0,
+        content: '/games/mathNinjaDojo.html'
+    },
+    {
         id: 'phys-static-01',
         title: 'Static Shock: The Electron Heist',
         description: 'Master the laws of static electricity! Rub materials together, track the moving electrons, and determine the net charge.',
