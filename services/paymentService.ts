@@ -15,8 +15,10 @@ export interface PaymentRequest {
     notes?: string;
 }
 
+const API_URL = process.env.VITE_API_URL || '';
+
 export const submitPaymentRequest = async (transactionId: string): Promise<{ message: string; requestId: string; status: string }> => {
-    const res = await fetch('/api/payment/request', {
+    const res = await fetch(`${API_URL}/api/payment/request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -32,7 +34,7 @@ export const submitPaymentRequest = async (transactionId: string): Promise<{ mes
 };
 
 export const getMyPaymentStatus = async (): Promise<{ requests: PaymentRequest[] }> => {
-    const res = await fetch('/api/payment/my-status', {
+    const res = await fetch(`${API_URL}/api/payment/my-status`, {
         credentials: 'include'
     });
 
@@ -45,7 +47,7 @@ export const getMyPaymentStatus = async (): Promise<{ requests: PaymentRequest[]
 
 // Admin functions
 export const getPendingPayments = async (): Promise<{ requests: PaymentRequest[] }> => {
-    const res = await fetch('/api/payment/pending', {
+    const res = await fetch(`${API_URL}/api/payment/pending`, {
         credentials: 'include'
     });
 
@@ -57,7 +59,7 @@ export const getPendingPayments = async (): Promise<{ requests: PaymentRequest[]
 };
 
 export const getAllPayments = async (status?: string): Promise<{ requests: PaymentRequest[] }> => {
-    const url = status ? `/api/payment/all?status=${status}` : '/api/payment/all';
+    const url = status ? `${API_URL}/api/payment/all?status=${status}` : `${API_URL}/api/payment/all`;
     const res = await fetch(url, {
         credentials: 'include'
     });
@@ -70,7 +72,7 @@ export const getAllPayments = async (status?: string): Promise<{ requests: Payme
 };
 
 export const approvePayment = async (id: string): Promise<{ message: string; paymentRequest: PaymentRequest }> => {
-    const res = await fetch(`/api/payment/approve/${id}`, {
+    const res = await fetch(`${API_URL}/api/payment/approve/${id}`, {
         method: 'POST',
         credentials: 'include'
     });
@@ -84,7 +86,7 @@ export const approvePayment = async (id: string): Promise<{ message: string; pay
 };
 
 export const rejectPayment = async (id: string, notes?: string): Promise<{ message: string; paymentRequest: PaymentRequest }> => {
-    const res = await fetch(`/api/payment/reject/${id}`, {
+    const res = await fetch(`${API_URL}/api/payment/reject/${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

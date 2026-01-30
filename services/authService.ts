@@ -1,8 +1,10 @@
 import { UserProfile } from '../types';
 
+const API_URL = process.env.VITE_API_URL || '';
+
 export const getCurrentUser = async (): Promise<UserProfile | null> => {
   try {
-    const res = await fetch('/api/auth/me');
+    const res = await fetch(`${API_URL}/api/auth/me`);
     if (res.ok) {
       return await res.json();
     }
@@ -14,7 +16,7 @@ export const getCurrentUser = async (): Promise<UserProfile | null> => {
 
 export const login = async (email: string, password: string): Promise<UserProfile | null> => {
   try {
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch(`${API_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -31,7 +33,7 @@ export const login = async (email: string, password: string): Promise<UserProfil
 
 export const loginWithGoogle = async (token: string): Promise<UserProfile | null> => {
   try {
-    const res = await fetch('/api/auth/google', {
+    const res = await fetch(`${API_URL}/api/auth/google`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token })
@@ -47,7 +49,7 @@ export const loginWithGoogle = async (token: string): Promise<UserProfile | null
 }
 
 export const signup = async (name: string, email: string, password: string): Promise<UserProfile> => {
-  const res = await fetch('/api/auth/signup', {
+  const res = await fetch(`${API_URL}/api/auth/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, email, password })
@@ -60,7 +62,7 @@ export const signup = async (name: string, email: string, password: string): Pro
 };
 
 export const logout = async (): Promise<void> => {
-  await fetch('/api/auth/logout', { method: 'POST' });
+  await fetch(`${API_URL}/api/auth/logout`, { method: 'POST' });
   window.location.reload();
 };
 
